@@ -3,7 +3,7 @@
 A from-scratch implementation of Counterfactual Regret Minimization (CFR) that solves
 Kuhn poker to its Nash equilibrium. Pure Python, no dependencies, ~110 lines.
 
-The solver converges to a game value of **-0.0555** chips per hand for Player 1, against
+The solver converges to a game value of **-0.0556** chips per hand for Player 1, against
 a theoretical value of **-1/18 = -0.0556**, and recovers Player 2's unique equilibrium
 strategy to three decimal places.
 
@@ -38,8 +38,8 @@ from kuhn_cfr import KuhnTrainer, exact_value
 trainer = KuhnTrainer()
 trainer.train(200_000)
 
-print(exact_value(trainer))                              # -0.0555
-print(trainer.nodes['Qb'].average_strategy())            # [0.664, 0.336]
+print(exact_value(trainer))                              # -0.0556
+print(trainer.nodes['Qb'].average_strategy())            # [0.661, 0.339]
 ```
 
 ---
@@ -359,40 +359,40 @@ before the stack unwinds.
 ## Sample output
 
 ```
-self-play average: -0.0609
-exact value of avg strategy: -0.0555   (theory -0.0556)
+self-play average: -0.0529
+exact value of avg strategy: -0.0556   (theory -0.0556)
 
  info set    pass     bet
-        J   0.913   0.087
-        K   0.710   0.290
+        J   0.692   0.308
+        K   0.067   0.933
         Q   1.000   0.000
        Jb   1.000   0.000
-       Jp   0.665   0.335
+       Jp   0.660   0.340
        Kb   0.000   1.000
        Kp   0.000   1.000
-       Qb   0.664   0.336
+       Qb   0.661   0.339
        Qp   1.000   0.000
       Jpb   1.000   0.000
       Kpb   0.000   1.000
-      Qpb   0.574   0.426
+      Qpb   0.354   0.646
 
-alpha (P1 bluffs J) = 0.087
-P1 bets K           = 0.290   (should be 3*alpha = 0.261)
+alpha (P1 bluffs J) = 0.308
+P1 bets K           = 0.933   (should be 3*alpha = 0.923)
 ```
 
 Per-deal expected values under the converged strategy:
 
 | deal | EV to P1 |
 |---|---|
-| P1:J  P2:Q | -0.9137 |
-| P1:J  P2:K | -1.0870 |
-| P1:Q  P2:J | +0.7579 |
-| P1:Q  P2:K | -1.4258 |
-| P1:K  P2:J | +1.2379 |
-| P1:K  P2:Q | +1.0977 |
-| **average** | **-0.0555** |
+| P1:J  P2:Q | -0.6979 |
+| P1:J  P2:K | -1.3076 |
+| P1:Q  P2:J | +0.9785 |
+| P1:Q  P2:K | -1.6457 |
+| P1:K  P2:J | +1.0226 |
+| P1:K  P2:Q | +1.3166 |
+| **average** | **-0.0556** |
 
-`Q vs K` at -1.4258 is the worst cell in the game — worse than holding the Jack —
+`Q vs K` at -1.6457 is the worst cell in the game — worse than holding the Jack —
 because the Queen is the hand that keeps paying off bets it cannot beat. That is
 precisely why the equilibrium checks it.
 
@@ -400,8 +400,8 @@ precisely why the equilibrium checks it.
 
 ## Validation
 
-**Player 2's strategy is unique**, so it can be checked entry by entry. `Qb` at 0.336
-and `Jp` at 0.335 are both 1/3. `Qp` is a pure check, `Kp` a pure bet, `Jb` a pure fold,
+**Player 2's strategy is unique**, so it can be checked entry by entry. `Qb` at 0.339
+and `Jp` at 0.340 are both 1/3. `Qp` is a pure check, `Kp` a pure bet, `Jb` a pure fold,
 `Kb` a pure call. All six match.
 
 **Player 1's strategy is not unique**, so specific values must not be asserted — the
@@ -414,10 +414,10 @@ assert abs(p1_open['K'][BET] - 3 * p1_open['J'][BET]) < 5e-2     # 3:1 ratio
 assert abs(exact_value(trainer) + 1/18) < 1e-3                   # game value
 ```
 
-The strongest single check is `Qpb` at 0.426 against a predicted α + 1/3 = 0.420. The
+The strongest single check is `Qpb` at 0.646 against a predicted α + 1/3 = 0.641. The
 solver was never told that relationship — it emerged from regret updates alone.
 
-`K` at 0.290 against 3α = 0.261 is the loosest fit, and that is expected: Player 1 is
+`K` at 0.933 against 3α = 0.923 is the loosest fit, and that is expected: Player 1 is
 exactly indifferent with both the Jack and the King, so those frequencies have no
 gradient pulling them anywhere specific. They drift along the equilibrium family, and
 the 3:1 ratio tightens slowly.
