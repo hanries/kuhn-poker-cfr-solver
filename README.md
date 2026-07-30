@@ -7,11 +7,15 @@ The solver converges to a game value of **-0.0556** chips per hand for Player 1,
 a theoretical value of **-1/18 = -0.0556**, and recovers Player 2's unique equilibrium
 strategy to three decimal places.
 
+**[Open the visualizer →](https://hanries.github.io/kuhn-poker-cfr-solver/)** Steps the
+recursion one node at a time and writes out the arithmetic as it goes.
+
 ---
 
 ## Contents
 
 - [Quick start](#quick-start)
+- [Visualizer](#visualizer)
 - [The game](#the-game)
 - [The known solution](#the-known-solution)
 - [How CFR works](#how-cfr-works)
@@ -41,6 +45,31 @@ trainer.train(200_000)
 print(exact_value(trainer))                              # -0.0556
 print(trainer.nodes['Qb'].average_strategy())            # [0.661, 0.339]
 ```
+
+---
+
+## Visualizer
+
+[hanries.github.io/kuhn-poker-cfr-solver](https://hanries.github.io/kuhn-poker-cfr-solver/)
+
+One self-contained HTML page, no build step and no dependencies, showing four linked views:
+
+- **The tree** for the current deal. Each decision node carries its information set, its
+  live regret-matched strategy, and its reach probability; returned utilities appear on the
+  edges as the recursion unwinds.
+- **The tape**, which writes out each step's arithmetic with the numbers substituted in —
+  regret matching, the `strategy_sum` accumulation, the sign flip on return, the baseline,
+  and the regret update.
+- **The twelve ledgers**, average-strategy bars with a marker at each equilibrium target.
+  Player 2's six entries settle onto their markers; the King tracks 3α as α drifts.
+- **Convergence**, `K` closing onto 3α and the game value approaching -1/18 on log axes.
+
+Step it, play it, or fast-forward to 200,000 iterations. The chance node switches between
+one sampled deal per iteration, as the Python does, and an exhaustive walk of all six.
+
+That second mode has no RNG, which makes it a cross-check rather than a demo: the
+JavaScript reproduces `kuhn_cfr.py` exactly, all twelve average strategies agreeing to
+eight decimal places at iteration 2,000.
 
 ---
 
@@ -292,6 +321,11 @@ keys to `Node` objects, plus the recursion and the loop.
 The only seam between the game layer and the learning layer is `info_set_key`, which
 turns game state into a dictionary key. Swap the game layer for Leduc and `Node` does
 not change; swap vanilla CFR for CFR+ and the rulebook does not change.
+
+**`docs/index.html`** is the visualizer, and it shares no code with `kuhn_cfr.py` — it
+carries its own JavaScript port of the same recursion. That duplication is the point:
+two independent implementations that agree to eight decimal places check each other in a
+way one implementation cannot check itself.
 
 ### The two ledgers
 

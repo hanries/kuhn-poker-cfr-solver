@@ -1,0 +1,960 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kuhn Poker CFR — the calculation, step by step</title>
+
+<style>
+/* ---------- reset ----------------------------------------------------- */
+*,*::before,*::after{ box-sizing:border-box; }
+html{ -webkit-text-size-adjust:100%; }
+body,h1,h3,p{ margin:0; }
+button,select{ font:inherit; color:inherit; }
+canvas,svg{ display:block; }
+
+/* ---------- tokens ---------------------------------------------------- */
+:root{
+  --stock:#E6E4DE; --card:#F4F3EF; --card-2:#EDEBE4; --sunk:#DEDBD3;
+  --ink:#16151A;   --ink-2:#4A4852; --ink-3:#7C7A85;
+  --red:#B22A32;   --red-2:#8E2129; --red-wash:rgba(178,42,50,.10);
+  --rule:#C9C6BD;  --hair:#D8D5CC;  --grid:#D3D0C7;
+  --live:#16151A;  --live-wash:rgba(22,21,26,.055);
+  --pos:#2F6F5E;   --neg:#96323A;
+  --shadow:0 1px 0 rgba(22,21,26,.05), 0 1px 6px rgba(22,21,26,.045);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --stock:#141317; --card:#1D1C21; --card-2:#24232A; --sunk:#101014;
+    --ink:#EDEAE2;   --ink-2:#A9A6AE; --ink-3:#77747E;
+    --red:#E0555C;   --red-2:#F0787E; --red-wash:rgba(224,85,92,.13);
+    --rule:#34323B;  --hair:#2A2830;  --grid:#2C2A33;
+    --live:#EDEAE2;  --live-wash:rgba(237,234,226,.07);
+    --pos:#5FAF97;   --neg:#D9666E;
+    --shadow:0 1px 0 rgba(0,0,0,.3), 0 1px 6px rgba(0,0,0,.25);
+  }
+}
+:root[data-theme="dark"]{
+  --stock:#141317; --card:#1D1C21; --card-2:#24232A; --sunk:#101014;
+  --ink:#EDEAE2;   --ink-2:#A9A6AE; --ink-3:#77747E;
+  --red:#E0555C;   --red-2:#F0787E; --red-wash:rgba(224,85,92,.13);
+  --rule:#34323B;  --hair:#2A2830;  --grid:#2C2A33;
+  --live:#EDEAE2;  --live-wash:rgba(237,234,226,.07);
+  --pos:#5FAF97;   --neg:#D9666E;
+  --shadow:0 1px 0 rgba(0,0,0,.3), 0 1px 6px rgba(0,0,0,.25);
+}
+:root[data-theme="light"]{
+  --stock:#E6E4DE; --card:#F4F3EF; --card-2:#EDEBE4; --sunk:#DEDBD3;
+  --ink:#16151A;   --ink-2:#4A4852; --ink-3:#7C7A85;
+  --red:#B22A32;   --red-2:#8E2129; --red-wash:rgba(178,42,50,.10);
+  --rule:#C9C6BD;  --hair:#D8D5CC;  --grid:#D3D0C7;
+  --live:#16151A;  --live-wash:rgba(22,21,26,.055);
+  --pos:#2F6F5E;   --neg:#96323A;
+  --shadow:0 1px 0 rgba(22,21,26,.05), 0 1px 6px rgba(22,21,26,.045);
+}
+
+:root{
+  --f-ui:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --f-mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --f-card:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+}
+
+/* ---------- frame ----------------------------------------------------- */
+body{ background:var(--stock); color:var(--ink); font-family:var(--f-ui);
+      -webkit-font-smoothing:antialiased; }
+.wrap{ max-width:1240px; margin:0 auto; padding:26px 20px 56px;
+       display:flex; flex-direction:column; gap:18px; }
+.mono{ font-family:var(--f-mono); font-variant-numeric:tabular-nums; }
+.eyebrow{ font-size:10.5px; letter-spacing:.15em; text-transform:uppercase;
+          color:var(--ink-3); font-weight:600; }
+
+/* masthead */
+.mast{ display:flex; flex-wrap:wrap; align-items:flex-end; gap:14px 24px;
+       border-bottom:1px solid var(--rule); padding-bottom:16px; }
+.mast h1{ font-size:23px; font-weight:600; letter-spacing:-.015em;
+          text-wrap:balance; line-height:1.2; }
+.mast h1 em{ font-style:normal; color:var(--red); }
+.mast p{ font-size:13.5px; color:var(--ink-2); max-width:56ch; line-height:1.5; }
+
+/* readout strip */
+.readout{ display:grid; grid-template-columns:repeat(auto-fit,minmax(148px,1fr));
+          gap:1px; background:var(--rule); border:1px solid var(--rule);
+          border-radius:3px; overflow:hidden; }
+.cell{ background:var(--card); padding:11px 13px; display:flex;
+       flex-direction:column; gap:5px; }
+.cell .k{ font-size:10px; letter-spacing:.12em; text-transform:uppercase;
+          color:var(--ink-3); font-weight:600; }
+.cell .v{ font-family:var(--f-mono); font-variant-numeric:tabular-nums;
+          font-size:19px; letter-spacing:-.02em; }
+.cell .n{ font-size:11px; color:var(--ink-3); font-family:var(--f-mono); }
+.cell .v.red{ color:var(--red); }
+
+/* controls */
+.bar{ display:flex; flex-wrap:wrap; gap:8px; align-items:center;
+      padding:10px 12px; background:var(--card); border:1px solid var(--rule);
+      border-radius:3px; box-shadow:var(--shadow); }
+button{ font-family:var(--f-ui); font-size:12.5px; font-weight:550; color:var(--ink);
+        background:var(--card-2); border:1px solid var(--rule); border-radius:2px;
+        padding:6px 11px; cursor:pointer; letter-spacing:.01em; }
+button:hover{ background:var(--sunk); }
+button:active{ transform:translateY(.5px); }
+button:focus-visible{ outline:2px solid var(--red); outline-offset:1px; }
+button[disabled]{ opacity:.4; cursor:default; }
+button.prime{ background:var(--ink); color:var(--stock); border-color:var(--ink); }
+button.prime:hover{ background:var(--ink-2); border-color:var(--ink-2); }
+.bar .sep{ width:1px; align-self:stretch; background:var(--hair); margin:0 3px; }
+.bar label{ font-size:11.5px; color:var(--ink-2); display:flex; gap:6px;
+            align-items:center; min-width:0; }
+.bar label select{ min-width:0; max-width:100%; }
+select{ font-family:var(--f-ui); font-size:12px; color:var(--ink);
+        background:var(--card-2); border:1px solid var(--rule);
+        border-radius:2px; padding:5px 7px; }
+select:focus-visible{ outline:2px solid var(--red); outline-offset:1px; }
+
+/* panels */
+.panel{ background:var(--card); border:1px solid var(--rule); border-radius:3px;
+        box-shadow:var(--shadow); display:flex; flex-direction:column;
+        min-width:0; overflow:hidden; }
+.phead{ display:flex; justify-content:space-between; align-items:baseline;
+        gap:12px; padding:10px 13px; border-bottom:1px solid var(--hair); }
+.phead .t{ font-size:12.5px; font-weight:600; letter-spacing:-.005em; }
+.pbody{ padding:13px; min-width:0; }
+
+.stage{ display:grid; grid-template-columns:minmax(0,1.42fr) minmax(0,1fr);
+        gap:18px; align-items:start; }
+@media (max-width:940px){ .stage{ grid-template-columns:minmax(0,1fr); } }
+
+/* tree */
+.treewrap{ overflow-x:auto; }
+svg.tree{ display:block; width:100%; min-width:600px; height:auto; }
+.hand{ display:flex; gap:14px; align-items:center; font-size:11.5px;
+       color:var(--ink-2); }
+.pip{ display:inline-flex; align-items:baseline; gap:5px; }
+.pip .rk{ font-family:var(--f-card); font-size:16px; line-height:1;
+          font-weight:600; }
+.pip .who{ font-size:10px; letter-spacing:.1em; text-transform:uppercase;
+           color:var(--ink-3); font-weight:600; }
+
+/* tape */
+.tape{ height:456px; overflow-y:auto; padding:0; }
+.blk{ padding:9px 13px; border-bottom:1px solid var(--hair); }
+.blk.now{ background:var(--live-wash); }
+.blk .ph{ font-size:9.5px; letter-spacing:.14em; text-transform:uppercase;
+          color:var(--ink-3); font-weight:700; margin-bottom:5px;
+          display:flex; justify-content:space-between; gap:8px; }
+.blk .ph .at{ color:var(--ink-3); letter-spacing:.02em; text-transform:none;
+              font-weight:600; font-family:var(--f-mono); }
+.blk .eq{ font-family:var(--f-mono); font-variant-numeric:tabular-nums;
+          font-size:12px; line-height:1.62; white-space:pre; overflow-x:auto;
+          color:var(--ink); }
+.blk .cm{ font-size:11.5px; color:var(--ink-2); line-height:1.45; margin-top:4px;
+          white-space:normal; }
+.tape .b{ color:var(--red); }  /* bet  */
+.tape .p{ color:var(--ink-2); } /* pass */
+.tape .em{ font-weight:700; }
+
+/* ledger */
+.groups{ display:grid; grid-template-columns:repeat(auto-fit,minmax(232px,1fr));
+         gap:1px; background:var(--rule); }
+.grp{ background:var(--card); padding:12px 13px 14px; display:flex;
+      flex-direction:column; gap:10px; }
+.grp .gh{ display:flex; flex-direction:column; gap:2px; }
+.grp .gh .who{ font-size:10px; letter-spacing:.12em; text-transform:uppercase;
+               color:var(--ink-3); font-weight:700; }
+.grp .gh .ctx{ font-size:11.5px; color:var(--ink-2); }
+.iset{ display:grid; grid-template-columns:34px minmax(0,1fr); gap:9px;
+       align-items:center; }
+.iset .key{ display:flex; flex-direction:column; align-items:flex-start; }
+.iset .key .rk{ font-family:var(--f-card); font-size:17px; line-height:1;
+                font-weight:600; }
+.iset .key .hs{ font-family:var(--f-mono); font-size:9.5px; color:var(--ink-3); }
+.iset .bars{ display:flex; flex-direction:column; gap:3px; min-width:0; }
+.sbar{ position:relative; height:15px; background:var(--sunk); border-radius:1px;
+       overflow:hidden; }
+.sbar i{ position:absolute; inset:0 auto 0 0; background:var(--ink-2);
+         transition:width .16s ease; }
+.sbar u{ position:absolute; top:0; bottom:0; width:1.5px; background:var(--red);
+         opacity:.85; }
+.sbar b{ position:absolute; right:4px; top:0; line-height:15px; font-size:9.5px;
+         font-family:var(--f-mono); font-variant-numeric:tabular-nums;
+         color:var(--ink); opacity:.85; }
+.tick{ position:absolute; top:-2px; bottom:-2px; width:1px; background:var(--ink);
+       opacity:.5; }
+.tick::after{ content:""; position:absolute; top:-3px; left:-2px;
+              border-left:2.5px solid transparent; border-right:2.5px solid transparent;
+              border-top:3px solid var(--ink); }
+.rbar{ position:relative; height:7px; background:var(--sunk); border-radius:1px; }
+.rbar .z{ position:absolute; top:0; bottom:0; left:50%; width:1px;
+          background:var(--grid); }
+.rbar i{ position:absolute; top:0; bottom:0; transition:all .16s ease; }
+.rlab{ font-size:9.5px; font-family:var(--f-mono); color:var(--ink-3);
+       display:flex; justify-content:space-between; }
+
+/* charts */
+.charts{ display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr));
+         gap:18px; }
+.cv{ width:100%; height:196px; display:block; }
+.legend{ display:flex; flex-wrap:wrap; gap:12px; font-size:11px;
+         color:var(--ink-2); padding:0 13px 12px; }
+.legend span{ display:inline-flex; align-items:center; gap:5px; }
+.legend i{ width:15px; height:0; border-top-width:2px; border-top-style:solid;
+           display:inline-block; }
+
+/* footnote */
+.note{ font-size:12.5px; color:var(--ink-2); line-height:1.6; max-width:74ch; }
+.note h3{ font-size:12px; font-weight:600; color:var(--ink); margin-bottom:5px;
+          letter-spacing:.01em; }
+.note code{ font-family:var(--f-mono); font-size:11.5px; background:var(--card-2);
+            padding:1px 4px; border-radius:2px; }
+.note + .note{ margin-top:12px; }
+
+@media (prefers-reduced-motion:reduce){
+  *{ transition:none !important; }
+}
+</style>
+</head>
+
+<body>
+<div class="wrap">
+
+  <div class="mast">
+    <div style="display:flex;flex-direction:column;gap:7px;flex:1 1 380px;min-width:0">
+      <div class="eyebrow">Counterfactual regret minimization · Kuhn poker</div>
+      <h1>Every number the solver touches, in the order it touches them</h1>
+      <p>Three cards, one betting round, twelve information sets. Step the recursion and
+         the tape on the right writes out the arithmetic — reach probabilities down,
+         negated utilities up, regret against the baseline at every node.</p>
+    </div>
+    <div class="hand" id="hand"></div>
+  </div>
+
+  <div class="readout" id="readout">
+    <div class="cell"><span class="k">Iterations</span><span class="v" id="ro-it">0</span><span class="n" id="ro-it-n">untrained</span></div>
+    <div class="cell"><span class="k">Game value to P1</span><span class="v" id="ro-gv">+0.1250</span><span class="n">theory −0.0556</span></div>
+    <div class="cell"><span class="k">α · P1 bets the Jack</span><span class="v red" id="ro-a">0.500</span><span class="n">equilibrium 0 – ⅓</span></div>
+    <div class="cell"><span class="k">P1 bets the King</span><span class="v red" id="ro-k">0.500</span><span class="n" id="ro-k-n">vs 3α 1.500</span></div>
+    <div class="cell"><span class="k">Exploitability</span><span class="v" id="ro-ex">0.9167</span><span class="n">0 at equilibrium</span></div>
+  </div>
+
+  <div class="bar">
+    <button class="prime" id="b-step">Step ▸</button>
+    <button id="b-play">Play</button>
+    <button id="b-node">Finish node</button>
+    <button id="b-iter">Finish deal</button>
+    <div class="sep"></div>
+    <span class="eyebrow">Train fast</span>
+    <button id="b-100">+100</button>
+    <button id="b-1k">+1,000</button>
+    <button id="b-10k">+10,000</button>
+    <button id="b-200k">+200,000</button>
+    <div class="sep"></div>
+    <label>Chance
+      <select id="s-chance">
+        <option value="sample">sampled deal (as in the code)</option>
+        <option value="all">all six deals</option>
+      </select>
+    </label>
+    <div class="sep"></div>
+    <button id="b-reset">Reset</button>
+  </div>
+
+  <div class="stage">
+    <div class="panel">
+      <div class="phead">
+        <span class="t">The tree for this deal</span>
+        <span class="eyebrow" id="tree-sub">value shown to the player who acts</span>
+      </div>
+      <div class="pbody treewrap"><svg class="tree" id="tree" viewBox="0 2 618 412" role="img"
+        aria-label="Kuhn poker game tree for the current deal"></svg></div>
+    </div>
+
+    <div class="panel">
+      <div class="phead">
+        <span class="t">Tape</span>
+        <span class="eyebrow" id="tape-sub">idle</span>
+      </div>
+      <div class="tape" id="tape"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="phead">
+      <span class="t">The twelve ledgers</span>
+      <span class="eyebrow">bar = average strategy · ▾ = equilibrium target · thin = regret sum</span>
+    </div>
+    <div class="groups" id="groups"></div>
+  </div>
+
+  <div class="charts">
+    <div class="panel">
+      <div class="phead"><span class="t">The 3:1 ratio emerges</span>
+        <span class="eyebrow">log iterations</span></div>
+      <div class="pbody" style="padding-bottom:4px"><canvas class="cv" id="c-ratio"></canvas></div>
+      <div class="legend">
+        <span><i style="border-color:var(--red)"></i>P1 bets K</span>
+        <span><i style="border-color:var(--red);border-top-style:dashed"></i>3α</span>
+        <span><i style="border-color:var(--ink-2)"></i>α = P1 bets J</span>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="phead"><span class="t">Game value</span>
+        <span class="eyebrow">log iterations</span></div>
+      <div class="pbody" style="padding-bottom:4px"><canvas class="cv" id="c-value"></canvas></div>
+      <div class="legend">
+        <span><i style="border-color:var(--ink)"></i>value of average strategy</span>
+        <span><i style="border-color:var(--ink-3);border-top-style:dashed"></i>−1/18</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel"><div class="pbody">
+    <div class="note">
+      <h3>Reading the signs</h3>
+      Every value — on the tree, on the tape, at the terminals — is stated from the point of
+      view of whoever is about to act. That is why each returned utility flips sign on the way
+      back up: <code>util[a] = −cfr(child)</code>. A terminal <code>bp</code> showing
+      <span class="mono">+1</span> means the player to act at that history collects one chip.
+    </div>
+    <div class="note">
+      <h3>Why regret is measured against the baseline</h3>
+      The update is <code>r[a] += π_opp · (u[a] − u_node)</code>, never <code>π_opp · u[a]</code>.
+      Subtracting <code>u_node</code> is what turns a thin edge between two actions into the
+      whole signal, and it is what makes the fixed point the indifference condition. Drop it and
+      every information set sits near uniform forever.
+    </div>
+    <div class="note">
+      <h3>Two different weights</h3>
+      <code>strategy_sum</code> is weighted by the acting player's <em>own</em> reach;
+      <code>regret_sum</code> by the <em>opponent's</em>. The second is what "counterfactual"
+      names: strip out your own probability of arriving, so you keep learning at the
+      information sets your current strategy avoids.
+    </div>
+  </div></div>
+</div>
+
+<script>
+"use strict";
+/* ===================================================================== *
+ * CFR core — mirrors kuhn_cfr.py line for line
+ * ===================================================================== */
+const RANKS = ["J","Q","K"], PASS = 0, BET = 1, ACTIONS = ["p","b"], NA = 2;
+const TERMINALS = new Set(["pp","bp","bb","pbp","pbb"]);
+const isTerminal = h => TERMINALS.has(h);
+
+function payoff(h, cards){
+  const player = h.length % 2, opp = 1 - player;
+  const wins = cards[player] > cards[opp];
+  if (h[h.length-1] === "p"){
+    if (h === "pp") return wins ? 1 : -1;   // check-check showdown
+    return 1;                               // bet, opponent folded
+  }
+  return wins ? 2 : -2;                     // called bet, showdown
+}
+const infoKey = (h, cards) => RANKS[cards[h.length % 2]] + h;
+
+const KEYS = ["J","Q","K","Jp","Qp","Kp","Jb","Qb","Kb","Jpb","Qpb","Kpb"];
+const newNodes = () => { const n = {};
+  for (const k of KEYS) n[k] = { regret:[0,0], strat:[0,0] }; return n; };
+
+function regretMatch(regret){
+  const pos = [Math.max(regret[0],0), Math.max(regret[1],0)];
+  const total = pos[0] + pos[1];
+  return { pos, total, strat: total > 0 ? [pos[0]/total, pos[1]/total] : [1/NA, 1/NA] };
+}
+function avgStrategy(node){
+  const t = node.strat[0] + node.strat[1];
+  return t > 0 ? [node.strat[0]/t, node.strat[1]/t] : [1/NA, 1/NA];
+}
+
+/* one CFR pass; if `tr` is an array, every intermediate quantity is recorded */
+function cfr(nodes, cards, h, p0, p1, tr){
+  if (isTerminal(h)){
+    const v = payoff(h, cards);
+    if (tr) tr.push({ t:"terminal", h, v });
+    return v;
+  }
+  const player = h.length % 2, key = infoKey(h, cards), node = nodes[key];
+  const selfReach = player === 0 ? p0 : p1;
+  const rm = regretMatch(node.regret);
+  if (tr) tr.push({ t:"enter", h, key, player, p0, p1, selfReach,
+                    regret:[...node.regret], rm });
+  const sDelta = [selfReach*rm.strat[0], selfReach*rm.strat[1]];
+  node.strat[0] += sDelta[0]; node.strat[1] += sDelta[1];
+  if (tr) tr.push({ t:"accum", h, key, selfReach, strat:rm.strat, delta:sDelta });
+
+  const util = [0,0]; let nodeUtil = 0;
+  for (let a = 0; a < NA; a++){
+    const nxt = h + ACTIONS[a];
+    const cp0 = player === 0 ? p0*rm.strat[a] : p0;
+    const cp1 = player === 0 ? p1 : p1*rm.strat[a];
+    if (tr) tr.push({ t:"descend", h, key, a, nxt, p0:cp0, p1:cp1 });
+    const child = cfr(nodes, cards, nxt, cp0, cp1, tr);
+    util[a] = -child;
+    if (tr) tr.push({ t:"return", h, key, a, child, u:util[a] });
+    nodeUtil += rm.strat[a] * util[a];
+  }
+  if (tr) tr.push({ t:"combine", h, key, strat:rm.strat, util, nodeUtil });
+
+  const oppReach = player === 0 ? p1 : p0;
+  const d = [ oppReach*(util[0]-nodeUtil), oppReach*(util[1]-nodeUtil) ];
+  node.regret[0] += d[0]; node.regret[1] += d[1];
+  if (tr) tr.push({ t:"regret", h, key, oppReach, util, nodeUtil, delta:d,
+                    after:[...node.regret] });
+  return nodeUtil;
+}
+
+/* evaluation: no learning, walks the average strategy over all six deals */
+const DEALS = [[0,1],[0,2],[1,0],[1,2],[2,0],[2,1]];
+function walkAvg(nodes, cards, h){
+  if (isTerminal(h)) return payoff(h, cards);
+  const avg = avgStrategy(nodes[infoKey(h, cards)]);
+  let s = 0;
+  for (let a = 0; a < NA; a++) s += avg[a] * -walkAvg(nodes, cards, h + ACTIONS[a]);
+  return s;
+}
+const exactValue = nodes =>
+  DEALS.reduce((s,d) => s + walkAvg(nodes, d, ""), 0) / DEALS.length;
+
+/* exploitability by brute force over pure strategies (64 each side) */
+const P0_SETS = ["J","Q","K","Jpb","Qpb","Kpb"];
+const P1_SETS = ["Jp","Qp","Kp","Jb","Qb","Kb"];
+function evP0(profile, cards, h){
+  if (isTerminal(h)) {
+    const v = payoff(h, cards);
+    return h.length % 2 === 0 ? v : -v;          // normalise to player 0
+  }
+  const pr = profile[infoKey(h, cards)];
+  let s = 0;
+  for (let a = 0; a < NA; a++) s += pr[a] * evP0(profile, cards, h + ACTIONS[a]);
+  return s;
+}
+const gameValue = profile =>
+  DEALS.reduce((s,d) => s + evP0(profile, d, ""), 0) / DEALS.length;
+
+function exploitability(nodes){
+  const avg = {}; for (const k of KEYS) avg[k] = avgStrategy(nodes[k]);
+  let br0 = -Infinity, br1 = -Infinity;
+  for (let m = 0; m < 64; m++){
+    const p = { ...avg }, q = { ...avg };
+    for (let i = 0; i < 6; i++){
+      const bit = (m >> i) & 1;
+      p[P0_SETS[i]] = bit ? [0,1] : [1,0];
+      q[P1_SETS[i]] = bit ? [0,1] : [1,0];
+    }
+    br0 = Math.max(br0,  gameValue(p));
+    br1 = Math.max(br1, -gameValue(q));
+  }
+  return br0 + br1;
+}
+
+/* ===================================================================== *
+ * state
+ * ===================================================================== */
+const mulberry32 = a => () => {
+  a |= 0; a = a + 0x6D2B79F5 | 0;
+  let t = Math.imul(a ^ a >>> 15, 1 | a);
+  t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+  return ((t ^ t >>> 14) >>> 0) / 4294967296;
+};
+const S = {
+  nodes:newNodes(), iter:0, chance:"sample", rand:mulberry32(91),
+  deal:[0,1,2], dealIdx:0,
+  trace:null, ti:0, playing:false, timer:null, samples:[]
+};
+
+function deal(){
+  const c = [0,1,2];                                   // Fisher–Yates, seeded
+  for (let i = 2; i > 0; i--){
+    const j = Math.floor(S.rand() * (i+1)); [c[i],c[j]] = [c[j],c[i]];
+  }
+  return c;
+}
+function nextDeal(){
+  if (S.chance === "all"){ S.dealIdx = (S.dealIdx + 1) % 6;
+    const d = DEALS[S.dealIdx]; S.deal = [d[0], d[1], 3-d[0]-d[1]]; }
+  else S.deal = deal();
+}
+
+/* ---- fast training (no tape) ---- */
+function train(n){
+  for (let i = 0; i < n; i++){
+    if (S.chance === "all") for (const d of DEALS) cfr(S.nodes, d, "", 1, 1, null);
+    else cfr(S.nodes, deal(), "", 1, 1, null);
+    S.iter++;
+    if (S.iter >= nextSample) sample();
+  }
+  sample(true);
+}
+let nextSample = 1;
+function sample(force){
+  const last = S.samples[S.samples.length-1];
+  if (!force && last && last.it === S.iter) return;
+  if (force && last && last.it === S.iter) return;
+  const a = avgStrategy(S.nodes.J)[BET], k = avgStrategy(S.nodes.K)[BET];
+  S.samples.push({ it:S.iter, a, k, v:exactValue(S.nodes) });
+  nextSample = Math.max(S.iter + 1, Math.ceil(S.iter * 1.28));
+}
+
+/* ---- traced stepping ---- */
+function beginTrace(){
+  const shadow = JSON.parse(JSON.stringify(S.nodes));   // trace on a copy…
+  const tr = [];
+  cfr(shadow, S.deal, "", 1, 1, tr);                    // …so the tape leads the ledgers
+  S.trace = tr; S.ti = 0;
+  tapeEl.innerHTML = "";
+}
+function stepOnce(){
+  if (!S.trace) beginTrace();
+  if (S.ti >= S.trace.length){                          // deal complete
+    S.iter += (S.chance === "all" && S.dealIdx !== 5) ? 0 : 1;
+    sample(true); nextDeal(); S.trace = null;
+    buildTree(); paint(); return false;
+  }
+  const e = S.trace[S.ti++];
+  if (e.t === "accum"){                                 // apply the real deltas
+    const n = S.nodes[e.key]; n.strat[0] += e.delta[0]; n.strat[1] += e.delta[1];
+  } else if (e.t === "regret"){
+    const n = S.nodes[e.key]; n.regret[0] += e.delta[0]; n.regret[1] += e.delta[1];
+  }
+  emit(e); paint();
+  return true;
+}
+function stepUntil(pred){
+  let guard = 0;
+  while (guard++ < 400){
+    const before = S.trace, e = S.trace ? S.trace[S.ti] : null;
+    if (!stepOnce()) return;
+    if (before && e && pred(e)) return;
+  }
+}
+
+/* ===================================================================== *
+ * tree rendering
+ * ===================================================================== */
+const NODES_H = ["", "p", "b", "pp", "pb", "bp", "bb", "pbp", "pbb"];
+const SLOT = { pp:0, pbp:1, pbb:2, bp:3, bb:4 };
+const LAY = {};
+(function layout(){
+  const col = 168, row = 84, top = 40;
+  const y = h => {
+    if (h in SLOT) return SLOT[h]*row + top;
+    return (y(h+"p") + y(h+"b")) / 2;
+  };
+  for (const h of NODES_H) LAY[h] = { x:h.length*col + 10, y:y(h) };
+})();
+const NS = "http://www.w3.org/2000/svg";
+const el = (n, at) => { const e = document.createElementNS(NS, n);
+  for (const k in at) e.setAttribute(k, at[k]); return e; };
+
+const treeEl = document.getElementById("tree");
+const DW = 138, DH = 54, TW = 92, TH = 38, BW = DW - 58;
+
+function buildTree(){
+  treeEl.innerHTML = "";
+  const gEdge = el("g",{}), gNode = el("g",{});
+  treeEl.append(gEdge, gNode);
+
+  for (const h of NODES_H){
+    if (isTerminal(h)) continue;
+    for (let a = 0; a < NA; a++){
+      const c = h + ACTIONS[a], A = LAY[h], B = LAY[c];
+      const x1 = A.x + DW, y1 = A.y, x2 = B.x, y2 = B.y, mid = x1 + 22;
+      gEdge.append(el("path",{ id:`e-${c}`, class:"edge",
+        d:`M ${x1} ${y1} H ${mid} V ${y2} H ${x2}`, fill:"none",
+        stroke:"var(--grid)", "stroke-width":1.25 }));
+      const t = el("text",{ id:`el-${c}`, x:mid-5, y:(y1+y2)/2 + (y2>y1?12:-6),
+        "text-anchor":"end", "font-size":10, "font-family":"var(--f-mono)",
+        fill: a === BET ? "var(--red)" : "var(--ink-3)" });
+      t.textContent = ACTIONS[a];
+      gEdge.append(t);
+      const uy = y2 - (isTerminal(c) ? TH/2 : DH/2) - 5;   // sits above the child box
+      const u = el("text",{ id:`eu-${c}`, x:x2+2, y:uy,
+        "font-size":10, "font-family":"var(--f-mono)", fill:"var(--ink-3)" });
+      gEdge.append(u);
+    }
+  }
+
+  for (const h of NODES_H){
+    const P = LAY[h], term = isTerminal(h);
+    const g = el("g",{ id:`n-${h||"root"}` });
+    if (term){
+      g.append(el("rect",{ x:P.x, y:P.y-TH/2, width:TW, height:TH, rx:2,
+        fill:"var(--card-2)", stroke:"var(--rule)", "stroke-width":1,
+        id:`nb-${h}` }));
+      const lab = el("text",{ x:P.x+9, y:P.y-3, "font-size":9.5,
+        "font-family":"var(--f-mono)", fill:"var(--ink-3)" });
+      lab.textContent = h;
+      const val = el("text",{ id:`tv-${h}`, x:P.x+9, y:P.y+13, "font-size":14,
+        "font-family":"var(--f-mono)", "font-weight":600, fill:"var(--ink)" });
+      g.append(lab, val);
+    } else {
+      g.append(el("rect",{ x:P.x, y:P.y-DH/2, width:DW, height:DH, rx:2,
+        fill:"var(--card-2)", stroke:"var(--rule)", "stroke-width":1,
+        id:`nb-${h||"root"}` }));
+      const rk = el("text",{ id:`nr-${h||"root"}`, x:P.x+9, y:P.y-8,
+        "font-size":15, "font-family":"var(--f-card)", "font-weight":600,
+        fill:"var(--ink)" });
+      const hs = el("text",{ x:P.x+24, y:P.y-8, "font-size":10,
+        "font-family":"var(--f-mono)", fill:"var(--ink-3)" });
+      hs.textContent = h === "" ? "open" : h;
+      const pi = el("text",{ id:`np-${h||"root"}`, x:P.x+DW-9, y:P.y-8,
+        "text-anchor":"end", "font-size":9.5, "font-family":"var(--f-mono)",
+        fill:"var(--ink-3)" });
+      // strategy bar: pass segment in ink, bet segment in red, label kept clear of both
+      g.append(el("rect",{ x:P.x+9, y:P.y+2, width:BW, height:11, rx:1,
+        fill:"var(--sunk)" }));
+      g.append(el("rect",{ id:`nsp-${h||"root"}`, x:P.x+9, y:P.y+2, width:0,
+        height:11, fill:"var(--ink-2)" }));
+      g.append(el("rect",{ id:`nsb-${h||"root"}`, x:P.x+9, y:P.y+2, width:0,
+        height:11, fill:"var(--red)" }));
+      const pct = el("text",{ id:`nt-${h||"root"}`, x:P.x+DW-9, y:P.y+11,
+        "text-anchor":"end", "font-size":9, "font-family":"var(--f-mono)",
+        fill:"var(--ink-3)" });
+      g.append(rk, hs, pi, pct);
+    }
+    gNode.append(g);
+  }
+  paintTree();
+}
+
+function paintTree(){
+  const cards = S.deal;
+  const ev = S.trace && S.ti > 0 ? S.trace[S.ti-1] : null;
+  const active = ev ? (ev.t === "descend" ? ev.nxt : ev.h) : null;
+  const path = new Set();
+  if (active) for (let i = 0; i <= active.length; i++) path.add(active.slice(0,i));
+
+  // returned utilities seen so far this deal
+  const seen = {};
+  if (S.trace) for (let i = 0; i < S.ti; i++){
+    const e = S.trace[i];
+    if (e.t === "return") seen[e.h + ACTIONS[e.a]] = e.u;
+  }
+
+  for (const h of NODES_H){
+    const on = path.has(h), box = document.getElementById(`nb-${h||"root"}`);
+    if (!box) continue;
+    box.setAttribute("stroke", h === active ? "var(--live)" : "var(--rule)");
+    box.setAttribute("stroke-width", h === active ? 2 : 1);
+    box.setAttribute("fill", on ? "var(--live-wash)" : "var(--card-2)");
+
+    if (isTerminal(h)){
+      const v = payoff(h, cards), t = document.getElementById(`tv-${h}`);
+      t.textContent = (v > 0 ? "+" : "−") + Math.abs(v);
+      t.setAttribute("fill", v > 0 ? "var(--ink)" : "var(--neg)");
+    } else {
+      document.getElementById(`nr-${h||"root"}`).textContent =
+        RANKS[cards[h.length % 2]];
+      const st = regretMatch(S.nodes[infoKey(h, cards)].regret).strat;
+      const wp = BW * st[PASS], id = h || "root";
+      document.getElementById(`nsp-${id}`).setAttribute("width", wp.toFixed(2));
+      const betSeg = document.getElementById(`nsb-${id}`);
+      betSeg.setAttribute("x", (LAY[h].x + 9 + wp).toFixed(2));
+      betSeg.setAttribute("width", (BW - wp).toFixed(2));
+      document.getElementById(`nt-${id}`).textContent =
+        `${(st[PASS]*100).toFixed(0)}/${(st[BET]*100).toFixed(0)}`;
+      const reach = ev && ev.h === h && ev.t === "enter"
+        ? (h.length % 2 === 0 ? ev.p0 : ev.p1) : null;
+      document.getElementById(`np-${h||"root"}`).textContent =
+        reach === null ? `P${h.length % 2 + 1}` : `π ${reach.toFixed(3)}`;
+    }
+    if (h === "") continue;
+    const e = document.getElementById(`e-${h}`);
+    const isBet = h[h.length-1] === "b";
+    e.setAttribute("stroke", on ? (isBet ? "var(--red)" : "var(--ink-2)") : "var(--grid)");
+    e.setAttribute("stroke-width", on ? 2 : 1.25);
+    const ut = document.getElementById(`eu-${h}`);
+    ut.textContent = h in seen ? (seen[h] >= 0 ? "+" : "−") + Math.abs(seen[h]).toFixed(2) : "";
+  }
+}
+
+/* ===================================================================== *
+ * tape
+ * ===================================================================== */
+const tapeEl = document.getElementById("tape");
+const f  = (x, n=4) => (x >= 0 ? " " : "−") + Math.abs(x).toFixed(n); // column-aligned
+const fx = (x, n=3) => (x < 0 ? "−" : "") + Math.abs(x).toFixed(n);   // inline
+const fs = x => (x >= 0 ? "+" : "−") + Math.abs(x);                   // signed integer
+const par = (x, n=3) => x < 0 ? `(${fx(x,n)})` : fx(x,n);             // parenthesise negatives
+const sp = s => `<span class="p">${s}</span>`, sb = s => `<span class="b">${s}</span>`;
+const keyHTML = k => `${k[0]}${k.length>1 ? "·"+k.slice(1) : " open"}`;
+
+function emit(e){
+  const B = document.createElement("div");
+  B.className = "blk now";
+  const prev = tapeEl.querySelector(".blk.now");
+  if (prev) prev.classList.remove("now");
+  let ph = "", body = "", cm = "";
+
+  if (e.t === "enter"){
+    ph = "regret matching";
+    const r = e.regret, pos = e.rm.pos, st = e.rm.strat;
+    body =
+`r        = [${f(r[0])}, ${f(r[1])}]
+r⁺       = [${f(pos[0])}, ${f(pos[1])}]
+Σr⁺      = ${f(pos[0]+pos[1])}
+σ        = [${f(st[0],3)}, ${f(st[1],3)}]   ${sp("pass")} / ${sb("bet")}`;
+    cm = e.rm.total > 0
+      ? "Positive regret only, normalised. Negative regret is discarded, not inverted."
+      : "No positive regret yet, so the strategy falls back to uniform.";
+  }
+  else if (e.t === "accum"){
+    ph = "strategy_sum update";
+    body =
+`strategy_sum += π_self · σ
+
+π_self   = ${f(e.selfReach)}
+Δ        = ${fx(e.selfReach,4)} × [${fx(e.strat[0])}, ${fx(e.strat[1])}]
+         = [${f(e.delta[0])}, ${f(e.delta[1])}]`;
+    cm = "Own reach, not the opponent's — an iteration that rarely arrived here should not dominate the average.";
+  }
+  else if (e.t === "descend"){
+    const A = e.a === BET ? sb("bet") : sp("pass");
+    ph = `descend · ${e.a === BET ? "bet" : "pass"}`;
+    body = `cfr("${e.nxt}", π₁ = ${fx(e.p0,4)}, π₂ = ${fx(e.p1,4)})`;
+    cm = `Only the acting player's reach is multiplied by σ[${e.a === BET ? "bet" : "pass"}]; the opponent's passes through untouched.`;
+  }
+  else if (e.t === "terminal"){
+    ph = "terminal";
+    const who = e.h.length % 2 === 0 ? "P1" : "P2";
+    const why = e.h === "pp" ? "check-check showdown, one chip each in"
+      : e.h[e.h.length-1] === "p" ? "the bet took it down, opponent folded"
+      : "bet called, two chips each in";
+    body = `payoff("${e.h}") = ${fs(e.v)}`;
+    cm = `${why} — stated for ${who}, the player whose turn it would be.`;
+  }
+  else if (e.t === "return"){
+    ph = "return · sign flips";
+    body = `u[${e.a === BET ? "bet " : "pass"}] = −(${fx(e.child)}) = ${fx(e.u)}`;
+    cm = "The child reported its value to the other player. Negate it to speak for this one.";
+  }
+  else if (e.t === "combine"){
+    ph = "baseline";
+    body =
+`u_node   = Σ σ[a]·u[a]
+         = ${fx(e.strat[0])}×${par(e.util[0])} + ${fx(e.strat[1])}×${par(e.util[1])}
+         = ${fx(e.nodeUtil,4)}`;
+    cm = "What the current strategy is actually worth here. Regret is measured against this, not against zero.";
+  }
+  else if (e.t === "regret"){
+    ph = "regret update";
+    body =
+`regret_sum += π_opp · (u[a] − u_node)
+
+π_opp    = ${f(e.oppReach)}
+${sp("pass")}     ${fx(e.oppReach,4)} × (${fx(e.util[0])} − ${par(e.nodeUtil)}) = ${f(e.delta[0])}
+${sb("bet")}      ${fx(e.oppReach,4)} × (${fx(e.util[1])} − ${par(e.nodeUtil)}) = ${f(e.delta[1])}
+r        → [${f(e.after[0])}, ${f(e.after[1])}]`;
+    cm = "The two deltas always sum to zero against the baseline — regret redistributes, it does not inflate.";
+  }
+
+  const at = e.key ? keyHTML(e.key) : `"${e.h}"`;
+  B.innerHTML = `<div class="ph"><span>${ph}</span><span class="at">${at}</span></div>` +
+                `<div class="eq">${body}</div>` + (cm ? `<div class="cm">${cm}</div>` : "");
+  tapeEl.append(B);
+  while (tapeEl.children.length > 60) tapeEl.firstChild.remove();
+  B.scrollIntoView({ block:"nearest" });
+  document.getElementById("tape-sub").textContent =
+    `${S.ti} / ${S.trace.length} steps · deal ${RANKS[S.deal[0]]}${RANKS[S.deal[1]]}`;
+}
+
+/* ===================================================================== *
+ * ledger
+ * ===================================================================== */
+const GROUPS = [
+  { who:"P1 · opening", ctx:"first to act, nothing has happened",
+    keys:["J","Q","K"], target:n => n === "Q" ? 0 : null },
+  { who:"P2 · facing a check", ctx:"history p — P1 declined to bet",
+    keys:["Jp","Qp","Kp"], target:n => ({ Jp:1/3, Qp:0, Kp:1 })[n] },
+  { who:"P2 · facing a bet", ctx:"history b — call or fold",
+    keys:["Jb","Qb","Kb"], target:n => ({ Jb:0, Qb:1/3, Kb:1 })[n] },
+  { who:"P1 · checked, then raised on", ctx:"history pb — call or fold",
+    keys:["Jpb","Qpb","Kpb"], target:n => n === "Jpb" ? 0 : n === "Kpb" ? 1 : null }
+];
+const groupsEl = document.getElementById("groups");
+(function buildLedger(){
+  for (const g of GROUPS){
+    const d = document.createElement("div"); d.className = "grp";
+    d.innerHTML = `<div class="gh"><span class="who">${g.who}</span>
+      <span class="ctx">${g.ctx}</span></div>` +
+      g.keys.map(k => `
+      <div class="iset">
+        <div class="key"><span class="rk">${k[0]}</span>
+          <span class="hs">${k.length>1 ? k.slice(1) : "—"}</span></div>
+        <div class="bars">
+          <div class="sbar"><i id="ab-${k}"></i><u id="au-${k}"></u>
+            <b id="at-${k}"></b><span class="tick" id="tk-${k}"></span></div>
+          <div class="rbar"><span class="z"></span><i id="rb-${k}"></i></div>
+          <div class="rlab"><span id="rl-${k}"></span><span id="rr-${k}"></span></div>
+        </div>
+      </div>`).join("");
+    groupsEl.append(d);
+  }
+})();
+
+function paintLedger(){
+  const alpha = avgStrategy(S.nodes.J)[BET];
+  const dyn = { K: 3*alpha, Qpb: alpha + 1/3 };
+  let maxAbs = 1e-9;
+  for (const k of KEYS) maxAbs = Math.max(maxAbs, Math.abs(S.nodes[k].regret[0]),
+                                                  Math.abs(S.nodes[k].regret[1]));
+  for (const g of GROUPS) for (const k of g.keys){
+    const n = S.nodes[k], avg = avgStrategy(n), cur = regretMatch(n.regret).strat;
+    document.getElementById(`ab-${k}`).style.width = (avg[PASS]*100).toFixed(2) + "%";
+    document.getElementById(`au-${k}`).style.left  = (cur[PASS]*100).toFixed(2) + "%";
+    document.getElementById(`at-${k}`).textContent = avg[BET].toFixed(3);
+    const tgt = g.target(k) ?? dyn[k];
+    const tk = document.getElementById(`tk-${k}`);
+    if (tgt === undefined || tgt === null || tgt > 1) tk.style.display = "none";
+    else { tk.style.display = "block"; tk.style.left = ((1-tgt)*100).toFixed(2) + "%"; }
+    // regret: pass left of zero-line, bet right, scaled to the largest magnitude
+    const r = n.regret, bar = document.getElementById(`rb-${k}`);
+    const which = Math.abs(r[BET]) >= Math.abs(r[PASS]) ? BET : PASS;
+    const v = r[which], w = Math.min(50, 50*Math.abs(v)/maxAbs);
+    bar.style.background = which === BET ? "var(--red)" : "var(--ink-2)";
+    if (v >= 0){ bar.style.left = "50%"; bar.style.right = "auto"; }
+    else { bar.style.right = "50%"; bar.style.left = "auto"; }
+    bar.style.width = w.toFixed(2) + "%";
+    document.getElementById(`rl-${k}`).textContent = "r " + f(r[PASS],2).trim();
+    document.getElementById(`rr-${k}`).textContent = f(r[BET],2).trim();
+  }
+}
+
+/* ===================================================================== *
+ * charts
+ * ===================================================================== */
+function css(v){ return getComputedStyle(document.documentElement)
+  .getPropertyValue(v).trim(); }
+
+function drawChart(id, series, yLo, yHi, refs){
+  const cv = document.getElementById(id), dpr = window.devicePixelRatio || 1;
+  const W = cv.clientWidth, H = cv.clientHeight;
+  cv.width = W*dpr; cv.height = H*dpr;
+  const g = cv.getContext("2d"); g.scale(dpr, dpr); g.clearRect(0,0,W,H);
+  const L = 40, R = 8, T = 10, Bm = 22, w = W-L-R, h = H-T-Bm;
+  const maxIt = Math.max(10, S.iter);
+  const X = it => L + w * Math.log10(Math.max(1,it)) / Math.log10(Math.max(10,maxIt));
+  const Y = v => T + h * (1 - (v-yLo)/(yHi-yLo));
+
+  g.strokeStyle = css("--grid"); g.fillStyle = css("--ink-3");
+  g.lineWidth = 1; g.font = `10px ${css("--f-mono") || "monospace"}`;
+  const ticks = 4;
+  for (let i = 0; i <= ticks; i++){
+    const v = yLo + (yHi-yLo)*i/ticks, y = Math.round(Y(v)) + .5;
+    g.beginPath(); g.moveTo(L, y); g.lineTo(L+w, y); g.stroke();
+    g.textAlign = "right"; g.textBaseline = "middle";
+    g.fillText(v.toFixed(2), L-6, y);
+  }
+  const decades = Math.ceil(Math.log10(Math.max(10,maxIt)));
+  g.textAlign = "center"; g.textBaseline = "top";
+  for (let d = 0; d <= decades; d++){
+    const it = Math.pow(10,d); if (it > maxIt*1.4) break;
+    const x = Math.round(X(it)) + .5;
+    g.beginPath(); g.moveTo(x, T); g.lineTo(x, T+h);
+    g.strokeStyle = css("--hair"); g.stroke();
+    g.fillText(it >= 1000 ? (it/1000)+"k" : String(it), x, T+h+5);
+  }
+  for (const r of refs || []){
+    g.strokeStyle = r.color; g.lineWidth = 1.25; g.setLineDash([4,3]);
+    g.beginPath(); g.moveTo(L, Y(r.v)); g.lineTo(L+w, Y(r.v)); g.stroke();
+    g.setLineDash([]);
+  }
+  for (const s of series){
+    if (S.samples.length < 2) continue;
+    g.strokeStyle = s.color; g.lineWidth = s.width || 1.6;
+    g.setLineDash(s.dash || []); g.beginPath();
+    S.samples.forEach((p, i) => {
+      const x = X(p.it), y = Y(s.get(p));
+      i ? g.lineTo(x,y) : g.moveTo(x,y);
+    });
+    g.stroke(); g.setLineDash([]);
+    const last = S.samples[S.samples.length-1];
+    g.fillStyle = s.color;
+    g.beginPath(); g.arc(X(last.it), Y(s.get(last)), 2.4, 0, 7); g.fill();
+  }
+}
+function paintCharts(){
+  drawChart("c-ratio", [
+    { get:p => Math.min(1,p.k), color:css("--red"), width:1.8 },
+    { get:p => Math.min(1,3*p.a), color:css("--red"), dash:[4,3], width:1.3 },
+    { get:p => p.a, color:css("--ink-2"), width:1.5 }
+  ], 0, 1);
+  drawChart("c-value", [
+    { get:p => Math.max(-0.3, Math.min(0.2, p.v)), color:css("--ink"), width:1.8 }
+  ], -0.15, 0.15, [{ v:-1/18, color:css("--ink-3") }]);
+}
+
+/* ===================================================================== *
+ * readout + paint
+ * ===================================================================== */
+function paintReadout(){
+  const a = avgStrategy(S.nodes.J)[BET], k = avgStrategy(S.nodes.K)[BET];
+  const v = exactValue(S.nodes);
+  document.getElementById("ro-it").textContent = S.iter.toLocaleString();
+  document.getElementById("ro-it-n").textContent =
+    S.iter === 0 ? "untrained" : S.chance === "all" ? "× 6 deals each" : "one deal each";
+  document.getElementById("ro-gv").textContent = (v>=0?"+":"−") + Math.abs(v).toFixed(4);
+  document.getElementById("ro-a").textContent = a.toFixed(3);
+  document.getElementById("ro-k").textContent = k.toFixed(3);
+  document.getElementById("ro-k-n").textContent = `vs 3α ${(3*a).toFixed(3)}`;
+  document.getElementById("ro-ex").textContent = exploitability(S.nodes).toFixed(4);
+  const h = document.getElementById("hand");
+  h.innerHTML = [0,1].map(i =>
+    `<span class="pip"><span class="who">P${i+1}</span>
+     <span class="rk">${RANKS[S.deal[i]]}</span></span>`).join("");
+}
+function paint(){ paintTree(); paintLedger(); paintReadout(); paintCharts(); }
+
+/* ===================================================================== *
+ * controls
+ * ===================================================================== */
+const $ = id => document.getElementById(id);
+$("b-step").onclick = () => { stopPlay(); stepOnce(); };
+$("b-node").onclick = () => { stopPlay(); stepUntil(e => e.t === "regret"); };
+$("b-iter").onclick = () => { stopPlay();
+  let g = 0; while (S.trace && g++ < 400) if (!stepOnce()) break;
+  if (!S.trace && g <= 1){ beginTrace(); while (g++ < 400) if (!stepOnce()) break; } };
+$("b-play").onclick = () => S.playing ? stopPlay() : startPlay();
+function startPlay(){ S.playing = true; $("b-play").textContent = "Pause";
+  S.timer = setInterval(() => stepOnce(), 320); }
+function stopPlay(){ S.playing = false; $("b-play").textContent = "Play";
+  clearInterval(S.timer); S.timer = null; }
+
+for (const [id,n] of [["b-100",100],["b-1k",1000],["b-10k",10000],["b-200k",200000]])
+  $(id).onclick = () => {
+    stopPlay(); S.trace = null; tapeEl.innerHTML = "";
+    $("tape-sub").textContent = `trained ${n.toLocaleString()} deals without tracing`;
+    train(n); nextDeal(); buildTree(); paint();
+  };
+
+$("s-chance").onchange = e => { S.chance = e.target.value; reset(); };
+$("b-reset").onclick = () => reset();
+function reset(){
+  stopPlay();
+  S.nodes = newNodes(); S.iter = 0; S.rand = mulberry32(91); S.samples = [];
+  S.trace = null; S.ti = 0; S.dealIdx = 0; nextSample = 1;
+  S.deal = S.chance === "all" ? [0,1,2] : deal();
+  tapeEl.innerHTML = ""; $("tape-sub").textContent = "idle";
+  sample(true); buildTree(); paint();
+}
+
+document.addEventListener("keydown", e => {
+  if (e.target.tagName === "SELECT") return;
+  if (e.key === "ArrowRight"){ e.preventDefault(); stopPlay(); stepOnce(); }
+  if (e.key === " "){ e.preventDefault(); S.playing ? stopPlay() : startPlay(); }
+});
+
+/* theme + size changes redraw the canvases */
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", paintCharts);
+new MutationObserver(paintCharts)
+  .observe(document.documentElement, { attributes:true, attributeFilter:["data-theme"] });
+addEventListener("resize", paintCharts);
+
+/* go */
+S.deal = deal();
+sample(true);
+buildTree();
+paint();
+</script>
+</body>
+</html>
