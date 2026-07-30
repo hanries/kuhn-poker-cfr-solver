@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Kuhn Poker CFR — the calculation, step by step</title>
+<title>Kuhn Poker CFR: the calculation, step by step</title>
 
 <style>
 /* ---------- reset ----------------------------------------------------- */
@@ -222,8 +222,9 @@ svg.tree{ display:block; width:100%; min-width:600px; height:auto; }
       <div class="eyebrow">Counterfactual regret minimization · Kuhn poker</div>
       <h1>Every number the solver touches, in the order it touches them</h1>
       <p>Three cards, one betting round, twelve information sets. Step the recursion and
-         the tape on the right writes out the arithmetic — reach probabilities down,
-         negated utilities up, regret against the baseline at every node.</p>
+         the tape on the right writes out the arithmetic as it goes. Reach
+         probabilities multiply on the way down, utilities flip sign on the way back
+         up, and every node gets its regret measured against the baseline.</p>
     </div>
     <div class="hand" id="hand"></div>
   </div>
@@ -231,14 +232,14 @@ svg.tree{ display:block; width:100%; min-width:600px; height:auto; }
   <div class="readout" id="readout">
     <div class="cell"><span class="k">Iterations</span><span class="v" id="ro-it">0</span><span class="n" id="ro-it-n">untrained</span></div>
     <div class="cell"><span class="k">Game value to P1</span><span class="v" id="ro-gv">+0.1250</span><span class="n">theory −0.0556</span></div>
-    <div class="cell"><span class="k">α · P1 bets the Jack</span><span class="v red" id="ro-a">0.500</span><span class="n">equilibrium 0 – ⅓</span></div>
+    <div class="cell"><span class="k">α · P1 bets the Jack</span><span class="v red" id="ro-a">0.500</span><span class="n">equilibrium 0 to ⅓</span></div>
     <div class="cell"><span class="k">P1 bets the King</span><span class="v red" id="ro-k">0.500</span><span class="n" id="ro-k-n">vs 3α 1.500</span></div>
     <div class="cell"><span class="k">Exploitability</span><span class="v" id="ro-ex">0.9167</span><span class="n">0 at equilibrium</span></div>
   </div>
 
   <div class="bar">
     <button class="prime" id="b-step">Step ▸</button>
-    <button id="b-play">Play</button>
+    <button id="b-play">Run one iteration</button>
     <button id="b-node">Finish node</button>
     <button id="b-iter">Finish deal</button>
     <div class="sep"></div>
@@ -310,8 +311,8 @@ svg.tree{ display:block; width:100%; min-width:600px; height:auto; }
   <div class="panel"><div class="pbody">
     <div class="note">
       <h3>Reading the signs</h3>
-      Every value — on the tree, on the tape, at the terminals — is stated from the point of
-      view of whoever is about to act. That is why each returned utility flips sign on the way
+      Every value on this page, whether on the tree, on the tape, or at a terminal, is
+      stated from the point of view of whoever is about to act. That is why each returned utility flips sign on the way
       back up: <code>util[a] = −cfr(child)</code>. A terminal <code>bp</code> showing
       <span class="mono">+1</span> means the player to act at that history collects one chip.
     </div>
@@ -335,7 +336,7 @@ svg.tree{ display:block; width:100%; min-width:600px; height:auto; }
 <script>
 "use strict";
 /* ===================================================================== *
- * CFR core — mirrors kuhn_cfr.py line for line
+ * CFR core: mirrors kuhn_cfr.py line for line
  * ===================================================================== */
 const RANKS = ["J","Q","K"], PASS = 0, BET = 1, ACTIONS = ["p","b"], NA = 2;
 const TERMINALS = new Set(["pp","bp","bb","pbp","pbb"]);
@@ -421,7 +422,7 @@ const P1_SETS = ["Jp","Qp","Kp","Jb","Qb","Kb"];
 function evP0(profile, cards, h){
   if (isTerminal(h)) {
     const v = payoff(h, cards);
-    return h.length % 2 === 0 ? v : -v;          // normalise to player 0
+    return h.length % 2 === 0 ? v : -v;          // normalize to player 0
   }
   const pr = profile[infoKey(h, cards)];
   let s = 0;
@@ -463,7 +464,7 @@ const S = {
 };
 
 function deal(){
-  const c = [0,1,2];                                   // Fisher–Yates, seeded
+  const c = [0,1,2];                                   // Fisher-Yates, seeded
   for (let i = 2; i > 0; i--){
     const j = Math.floor(S.rand() * (i+1)); [c[i],c[j]] = [c[j],c[i]];
   }
@@ -695,7 +696,7 @@ r⁺       = [${f(pos[0])}, ${f(pos[1])}]
 Σr⁺      = ${f(pos[0]+pos[1])}
 σ        = [${f(st[0],3)}, ${f(st[1],3)}]   ${sp("pass")} / ${sb("bet")}`;
     cm = e.rm.total > 0
-      ? "Positive regret only, normalised. Negative regret is discarded, not inverted."
+      ? "Positive regret only, normalized. Negative regret is thrown away rather than inverted."
       : "No positive regret yet, so the strategy falls back to uniform.";
   }
   else if (e.t === "accum"){
@@ -706,7 +707,7 @@ r⁺       = [${f(pos[0])}, ${f(pos[1])}]
 π_self   = ${f(e.selfReach)}
 Δ        = ${fx(e.selfReach,4)} × [${fx(e.strat[0])}, ${fx(e.strat[1])}]
          = [${f(e.delta[0])}, ${f(e.delta[1])}]`;
-    cm = "Own reach, not the opponent's — an iteration that rarely arrived here should not dominate the average.";
+    cm = "Own reach, not the opponent's. An iteration that rarely arrived here should not dominate the average.";
   }
   else if (e.t === "descend"){
     const A = e.a === BET ? sb("bet") : sp("pass");
@@ -721,7 +722,7 @@ r⁺       = [${f(pos[0])}, ${f(pos[1])}]
       : e.h[e.h.length-1] === "p" ? "the bet took it down, opponent folded"
       : "bet called, two chips each in";
     body = `payoff("${e.h}") = ${fs(e.v)}`;
-    cm = `${why} — stated for ${who}, the player whose turn it would be.`;
+    cm = `${why}. Stated for ${who}, the player whose turn it would be.`;
   }
   else if (e.t === "return"){
     ph = "return · sign flips";
@@ -734,7 +735,7 @@ r⁺       = [${f(pos[0])}, ${f(pos[1])}]
 `u_node   = Σ σ[a]·u[a]
          = ${fx(e.strat[0])}×${par(e.util[0])} + ${fx(e.strat[1])}×${par(e.util[1])}
          = ${fx(e.nodeUtil,4)}`;
-    cm = "What the current strategy is actually worth here. Regret is measured against this, not against zero.";
+    cm = "What the current strategy is worth here. Regret is measured against this rather than against zero.";
   }
   else if (e.t === "regret"){
     ph = "regret update";
@@ -745,7 +746,7 @@ r⁺       = [${f(pos[0])}, ${f(pos[1])}]
 ${sp("pass")}     ${fx(e.oppReach,4)} × (${fx(e.util[0])} − ${par(e.nodeUtil)}) = ${f(e.delta[0])}
 ${sb("bet")}      ${fx(e.oppReach,4)} × (${fx(e.util[1])} − ${par(e.nodeUtil)}) = ${f(e.delta[1])}
 r        → [${f(e.after[0])}, ${f(e.after[1])}]`;
-    cm = "The two deltas always sum to zero against the baseline — regret redistributes, it does not inflate.";
+    cm = "The two deltas always sum to zero against the baseline, so regret gets redistributed between the actions rather than inflated.";
   }
 
   const at = e.key ? keyHTML(e.key) : `"${e.h}"`;
@@ -753,7 +754,9 @@ r        → [${f(e.after[0])}, ${f(e.after[1])}]`;
                 `<div class="eq">${body}</div>` + (cm ? `<div class="cm">${cm}</div>` : "");
   tapeEl.append(B);
   while (tapeEl.children.length > 60) tapeEl.firstChild.remove();
-  B.scrollIntoView({ block:"nearest" });
+  // scroll the tape itself. scrollIntoView would also scroll every scrollable
+  // ancestor, including the page, dragging the controls out from under the reader.
+  tapeEl.scrollTop = tapeEl.scrollHeight;
   document.getElementById("tape-sub").textContent =
     `${S.ti} / ${S.trace.length} steps · deal ${RANKS[S.deal[0]]}${RANKS[S.deal[1]]}`;
 }
@@ -764,11 +767,11 @@ r        → [${f(e.after[0])}, ${f(e.after[1])}]`;
 const GROUPS = [
   { who:"P1 · opening", ctx:"first to act, nothing has happened",
     keys:["J","Q","K"], target:n => n === "Q" ? 0 : null },
-  { who:"P2 · facing a check", ctx:"history p — P1 declined to bet",
+  { who:"P2 · facing a check", ctx:"history p: P1 declined to bet",
     keys:["Jp","Qp","Kp"], target:n => ({ Jp:1/3, Qp:0, Kp:1 })[n] },
-  { who:"P2 · facing a bet", ctx:"history b — call or fold",
+  { who:"P2 · facing a bet", ctx:"history b: call or fold",
     keys:["Jb","Qb","Kb"], target:n => ({ Jb:0, Qb:1/3, Kb:1 })[n] },
-  { who:"P1 · checked, then raised on", ctx:"history pb — call or fold",
+  { who:"P1 · checked, then raised on", ctx:"history pb: call or fold",
     keys:["Jpb","Qpb","Kpb"], target:n => n === "Jpb" ? 0 : n === "Kpb" ? 1 : null }
 ];
 const groupsEl = document.getElementById("groups");
@@ -780,7 +783,7 @@ const groupsEl = document.getElementById("groups");
       g.keys.map(k => `
       <div class="iset">
         <div class="key"><span class="rk">${k[0]}</span>
-          <span class="hs">${k.length>1 ? k.slice(1) : "—"}</span></div>
+          <span class="hs">${k.length>1 ? k.slice(1) : "open"}</span></div>
         <div class="bars">
           <div class="sbar"><i id="ab-${k}"></i><u id="au-${k}"></u>
             <b id="at-${k}"></b><span class="tick" id="tk-${k}"></span></div>
@@ -915,9 +918,13 @@ $("b-iter").onclick = () => { stopPlay();
   let g = 0; while (S.trace && g++ < 400) if (!stepOnce()) break;
   if (!S.trace && g <= 1){ beginTrace(); while (g++ < 400) if (!stepOnce()) break; } };
 $("b-play").onclick = () => S.playing ? stopPlay() : startPlay();
-function startPlay(){ S.playing = true; $("b-play").textContent = "Pause";
-  S.timer = setInterval(() => stepOnce(), 320); }
-function stopPlay(){ S.playing = false; $("b-play").textContent = "Play";
+/* walks exactly one iteration and stops. stepOnce returns false at the moment the
+   current deal finishes, which is the signal to halt. */
+function startPlay(){
+  S.playing = true; $("b-play").textContent = "Stop";
+  S.timer = setInterval(() => { if (!stepOnce()) stopPlay(); }, 420);
+}
+function stopPlay(){ S.playing = false; $("b-play").textContent = "Run one iteration";
   clearInterval(S.timer); S.timer = null; }
 
 for (const [id,n] of [["b-100",100],["b-1k",1000],["b-10k",10000],["b-200k",200000]])

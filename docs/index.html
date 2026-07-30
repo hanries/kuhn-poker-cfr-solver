@@ -229,10 +229,10 @@ a{ color:var(--teal); font-weight:600; }
 <header class="stack">
   <span class="eyebrow">Counterfactual Regret Minimization</span>
   <h1>How a program learns to play poker perfectly</h1>
-  <p class="lede">No opening book, no hand-coded rules, no human games to copy.
-    It plays itself a few hundred thousand times and keeps score of the moves it
-    wishes it had made. That turns out to be enough to reach a strategy nobody
-    can beat.</p>
+  <p class="lede">Nobody hands it an opening book or a single game of human play to
+    copy. It plays itself a few hundred thousand times and keeps score of the moves
+    it wishes it had made instead. That score alone is enough to reach a strategy no
+    opponent can beat.</p>
 </header>
 
 <!-- ================= the game ================= -->
@@ -246,26 +246,25 @@ a{ color:var(--teal); font-weight:600; }
       <span class="gt">beats</span>
       <div class="rk"><div class="card sm"><span class="cn">J</span><span class="mid">J</span></div><span class="w">low</span></div>
     </div>
-    <p><b>Kuhn poker.</b> A three-card deck. Each player antes 1 chip and gets one
-      card. Player&nbsp;1 acts first and may <b>pass</b> or <b>bet</b> 1 chip. Facing
-      a bet you may <b>call</b> or <b>fold</b>; facing a pass the other player may
-      pass (showdown) or bet. Highest card wins the pot at a showdown, and a fold
-      hands the pot over without one.</p>
-    <p>Small enough to solve exactly on paper, which is exactly why it is the
-      standard test case — you can check the program against the known answer. The
-      whole game is five possible endings:</p>
+    <p>The game is Kuhn poker, played with a three-card deck. Each player antes 1 chip
+      and gets one card. Player&nbsp;1 acts first and may <b>pass</b> or <b>bet</b> 1
+      chip. Facing a bet you may <b>call</b> or <b>fold</b>; facing a pass the other
+      player may pass (showdown) or bet. Highest card wins the pot at a showdown, and
+      a fold hands the pot over without one.</p>
+    <p>It is small enough to solve exactly on paper, which is why it became the
+      standard test case. You can check a program against an answer you already know.
+      The whole game comes down to five possible endings:</p>
     <div class="math"><span class="c">history   ending                                    net to the player who just acted</span>
 <span class="p">pp</span>        both pass, showdown for 1 chip            <span class="hi">±1</span>
 <span class="p">bp</span>        bet, fold                                 <span class="hi">+1</span>
 <span class="p">bb</span>        bet, call, showdown for 2 chips           <span class="hi">±2</span>
 <span class="p">pbp</span>       pass, bet, fold                           <span class="hi">+1</span>
 <span class="p">pbb</span>       pass, bet, call, showdown for 2 chips     <span class="hi">±2</span></div>
-    <p>A player never sees the other card, so what they actually know is
-      <b>their own card plus the betting so far</b>. That pair is called an
-      <b>information set</b>. Three cards × four betting situations
-      (<span class="m">"" · p · b · pb</span>) gives this game exactly
-      <b>12 information sets</b> — 12 decisions to get right, and the entire job is
-      picking a pass/bet mix for each one.</p>
+    <p>A player never sees the other card, so what they know is their own card plus
+      the betting so far. That pair is called an <b>information set</b>. Three cards
+      times four betting situations (<span class="m">"" · p · b · pb</span>) gives
+      this game exactly 12 of them, so there are 12 decisions to get right. The
+      entire job is picking a pass/bet mix for each one.</p>
   </div>
 </section>
 
@@ -275,14 +274,14 @@ a{ color:var(--teal); font-weight:600; }
 
   <div class="box stack">
     <h3>The obstacle</h3>
-    <p>You cannot just play the highest-value move, because value depends on what
-      the opponent does — and their best response depends on you. Chase it directly
-      and you get a cycle: you adjust, they adjust, you adjust back. There is no
-      fixed target to hill-climb toward.</p>
-    <p>What you want instead is a <b>Nash equilibrium</b>: a pair of strategies
-      where neither player can improve by changing their own. CFR finds one without
-      ever searching for it directly. It optimizes a different quantity that happens
-      to drag the strategy to equilibrium as a side effect.</p>
+    <p>You cannot just play the highest-value move, because value depends on what the
+      opponent does, and their best response depends on you. Chase it directly and you
+      get a cycle: you adjust, they adjust, you adjust back. There is no fixed target
+      to hill-climb toward.</p>
+    <p>What you want instead is a <b>Nash equilibrium</b>, a pair of strategies where
+      neither player can improve by changing their own. CFR gets to one without ever
+      searching for it. It optimizes a different quantity, and equilibrium falls out
+      as a side effect.</p>
   </div>
 
   <div class="box stack">
@@ -291,91 +290,93 @@ a{ color:var(--teal); font-weight:600; }
       answers:</p>
     <p class="q">How much better off would I have been if I had always played
       <span class="m">a</span> here, instead of what my strategy actually did?</p>
-    <p>Positive regret means the action is underused. So use it more — literally in
-      proportion to its regret. That rule is <b>regret matching</b>:</p>
+    <p>Positive regret means the action is underused, so use it more, in direct
+      proportion to how much regret it has piled up. That rule is
+      <b>regret matching</b>:</p>
     <div class="math"><span class="hi">σ(a) = R⁺(a) / Σ<sub>a'</sub> R⁺(a')</span>          where R⁺ = max(R, 0)
 
 <span class="c">all regrets ≤ 0  →  fall back to a uniform mix</span></div>
-    <p>Negative regret is discarded rather than inverted: "I wish I hadn't" is not
-      an instruction to do the opposite, only to stop doing this. And notice what
-      the denominator does — an action with twice the regret gets twice the
-      probability, so the mix is <em>always</em> mixed. Nothing ever collapses to a
-      single pure action while another still has positive regret. That is what makes
-      bluffing appear on its own.</p>
+    <p>Negative regret gets thrown away rather than inverted. "I wish I hadn't" is not
+      an instruction to do the opposite, only to stop doing this one. The denominator
+      matters too: an action with twice the regret gets twice the probability, so the
+      result is always a mix. Nothing collapses to a single pure action while some
+      other action still carries positive regret. This is the reason bluffing shows up
+      without anyone asking for it.</p>
   </div>
 
   <div class="box stack">
-    <h3>Two details that make it actually work</h3>
+    <h3>Two details that make it work</h3>
 
-    <p><b>1. Measure against the baseline, not against zero.</b> The value of an
-      action is compared with what the current strategy is already worth at that
-      node:</p>
+    <p>First, <b>measure against the baseline rather than against zero</b>. The value
+      of an action is compared with what the current strategy is already worth at
+      that node:</p>
     <div class="math">u<sub>σ</sub> = Σ<sub>a</sub> σ(a)·u(a)          <span class="c">what the current mix is worth here</span>
 
 <span class="hi">R(a) += u(a) − u<sub>σ</sub></span>            <span class="c">regret, relative to that</span></div>
     <p>This matters more than it looks. If two actions are worth 1.16 and 1.17,
-      splitting by raw value gives 49.8% / 50.2% and the program never learns.
-      Subtracting the baseline turns that thin edge into the entire signal. It also
-      creates the fixed point: because <span class="m">u<sub>σ</sub></span> is an
-      average of the action values, playing a high-regret action more pulls
-      <span class="m">u<sub>σ</sub></span> toward it, which shrinks its own regret.
-      The system settles where every action in use has <em>equal value</em> — which
-      is precisely the indifference condition that defines the equilibrium. Zero
-      regret and indifference are the same statement.</p>
+      splitting by raw value gives 49.8% against 50.2%, and the program learns
+      nothing. Subtracting the baseline turns that thin edge into the whole signal.
+      It also builds the fixed point. Because <span class="m">u<sub>σ</sub></span> is
+      an average of the action values, playing a high-regret action more often pulls
+      <span class="m">u<sub>σ</sub></span> up toward it, which shrinks that action's
+      own regret. The system settles where every action in use has equal value, and
+      that is the indifference condition defining the equilibrium. Zero regret and
+      indifference turn out to be the same statement.</p>
 
-    <p><b>2. Weight by the opponent's chance of getting you here, not your own.</b>
-      This is the "counterfactual" in the name:</p>
+    <p>Second, <b>weight by the opponent's chance of getting you here rather than your
+      own</b>. This is the "counterfactual" in the name:</p>
     <div class="math"><span class="hi">R(a) += π<sub>opp</sub> · (u(a) − u<sub>σ</sub>)</span></div>
     <p>Suppose your current strategy never bets the Jack. Then you never reach any
-      decision that follows a Jack bet. Weight regret by your <em>own</em>
-      probability of arriving and those decisions count for nothing, so you never
-      learn to fix them, so you keep not going there — a trap you cannot climb out
-      of. Dropping your own reach probability breaks it: <em>counter to fact</em>,
-      assume you got here, and evaluate honestly.</p>
-    <p class="small">The running average of your strategy uses the opposite weight —
-      your <em>own</em> reach. An iteration where you rarely reached a node should
-      not dominate the record of what you do there. Two ledgers, two different
-      weights; mixing them up is the classic implementation bug.</p>
+      decision that follows a Jack bet. If you weight regret by your own probability
+      of arriving, those decisions count for nothing, so you never learn to fix them,
+      so you carry on avoiding them. It is a trap with no exit from the inside.
+      Dropping your own reach probability is what breaks it. Counter to fact, assume
+      you got there, then evaluate honestly.</p>
+    <p class="small">The running average of your strategy uses the opposite weight,
+      your own reach. An iteration where you rarely reached a node should not dominate
+      the record of what you do there. Two ledgers, two different weights. Mixing them
+      up is the classic implementation bug.</p>
   </div>
 
   <div class="box stack">
     <h3>Why it converges</h3>
     <p>Regret matching has a guarantee: average regret per iteration falls like
       <span class="m">1/√T</span>, so it goes to zero. Bolt that to a folk theorem
-      about two-player zero-sum games —</p>
+      about two-player zero-sum games, which says that</p>
     <p class="q">if both players' average regret is at most ε, their average
       strategies form a 2ε-Nash equilibrium</p>
-    <p>— and the algorithm follows. Drive regret to zero by self-play and the
-      average strategy is driven to equilibrium for free. You never solve for the
-      equilibrium; you just refuse to keep regretting things.</p>
-    <p><b>The average, not the latest.</b> The current strategy oscillates forever
-      and never settles — watch the bars below jitter while training. Only the
-      reach-weighted average over all iterations converges. The plain unweighted
-      average does not work: behavioural strategies do not average linearly.</p>
+    <p>and the algorithm follows. Drive regret to zero through self-play and the
+      average strategy gets dragged to equilibrium for free, without any step in the
+      process ever computing what that equilibrium is.</p>
+    <p>One more thing about that average. The current strategy oscillates forever and
+      never settles, which you can watch for yourself in the bars further down while
+      training runs. Only the reach-weighted average over all iterations converges. A
+      plain unweighted average will not do the job, because behavioral strategies do
+      not average linearly.</p>
   </div>
 </section>
 
 <!-- ================= the algorithm ================= -->
 <section>
   <h2>The algorithm, in full</h2>
-  <p class="small">One recursive walk of the game tree. This is the whole thing —
+  <p class="small">One recursive walk of the game tree. This is the whole algorithm;
     the Python in this repository is this plus bookkeeping.</p>
   <div class="box stack">
     <div class="math"><span class="c">cfr(history, π₁, π₂):</span>
 
   <span class="c">if history is terminal:</span>
-      <span class="c">return</span> payoff(history)                  <span class="c">— value to whoever acts here</span>
+      <span class="c">return</span> payoff(history)                  <span class="c"># value to whoever acts here</span>
 
-  σ = R⁺ / ΣR⁺                             <span class="c">— regret matching</span>
-  strategy_sum += <span class="hi">π<sub>self</sub></span> · σ                   <span class="c">— own reach, for the average</span>
+  σ = R⁺ / ΣR⁺                             <span class="c"># regret matching</span>
+  strategy_sum += <span class="hi">π<sub>self</sub></span> · σ                   <span class="c"># own reach, for the average</span>
 
   <span class="c">for a in {pass, bet}:</span>
       u[a] = <span class="hi">−</span>cfr(history + a, π with σ(a) folded in)
-                                           <span class="c">— negate: value changes sides</span>
-  u<sub>σ</sub> = Σ σ(a)·u[a]                        <span class="c">— the baseline</span>
+                                           <span class="c"># negate: value changes sides</span>
+  u<sub>σ</sub> = Σ σ(a)·u[a]                        <span class="c"># the baseline</span>
 
   <span class="c">for a in {pass, bet}:</span>
-      R[a] += <span class="hi">π<sub>opp</sub></span> · (u[a] − u<sub>σ</sub>)          <span class="c">— counterfactual regret</span>
+      R[a] += <span class="hi">π<sub>opp</sub></span> · (u[a] − u<sub>σ</sub>)          <span class="c"># counterfactual regret</span>
 
   <span class="c">return</span> u<sub>σ</sub></div>
     <dl class="defn">
@@ -388,9 +389,9 @@ a{ color:var(--teal); font-weight:600; }
       <dt>−cfr(…)</dt><dd>every value is stated from the point of view of whoever is
         about to act, so it flips sign on the way back up</dd>
     </dl>
-    <p class="small">Deal a random hand, call it once, repeat. Nothing else.
-      Chance is handled by sampling one deal per iteration, so the 1/6 probability
-      of each deal is implicit in how often it comes up rather than multiplied in.</p>
+    <p class="small">Deal a random hand, call it once, then repeat. Chance is handled
+      by sampling one deal per iteration, so the 1/6 probability of each deal is
+      implicit in how often it comes up rather than multiplied in anywhere.</p>
   </div>
 </section>
 
@@ -405,7 +406,7 @@ a{ color:var(--teal); font-weight:600; }
       <div class="who"><span class="face">🤖</span><span class="nm">Solver</span>
         <span class="rl">P1</span></div>
       <div class="card back" id="c-p1"><span class="cn">?</span><span class="mid">?</span></div>
-      <div class="act"><span class="badge wait" id="a-p1">—</span></div>
+      <div class="act"><span class="badge wait" id="a-p1">to act</span></div>
     </div>
     <div class="pot">
       <span class="lab">Pot</span><div class="chips" id="pot"></div>
@@ -415,7 +416,7 @@ a{ color:var(--teal); font-weight:600; }
       <div class="who"><span class="face">🐱</span><span class="nm">Opponent</span>
         <span class="rl">P2</span></div>
       <div class="card back" id="c-p2"><span class="cn">?</span><span class="mid">?</span></div>
-      <div class="act"><span class="badge wait" id="a-p2">—</span></div>
+      <div class="act"><span class="badge wait" id="a-p2">to act</span></div>
     </div>
   </div>
 
@@ -423,14 +424,14 @@ a{ color:var(--teal); font-weight:600; }
 
   <div class="controls">
     <button class="go" id="b-next">Deal</button>
-    <button id="b-auto">Auto</button>
+    <button id="b-auto">Run one iteration</button>
     <span class="counter" id="count">iterations: 0</span>
   </div>
 
   <div class="box stack" id="mathbox">
     <h3 id="math-h">The arithmetic at P1's opening decision</h3>
     <p class="small" id="math-sub">Both players' cards are shown here for clarity.
-      Neither player sees the other's — the program only ever reads its own
+      Neither player sees the other's; the program only ever reads its own
       information set.</p>
     <div class="math" id="math-body"><span class="c">step through a hand to fill this in</span></div>
     <p class="small" id="math-note"></p>
@@ -440,10 +441,10 @@ a{ color:var(--teal); font-weight:600; }
 <!-- ================= ledgers ================= -->
 <section>
   <h2>The three opening decisions</h2>
-  <p class="small">Red bar = how often the average strategy bets. Where theory pins
-    a value exactly, a marker shows it. The Jack gets a striped band instead,
-    because <em>any</em> bluffing rate in that range is equally optimal — it is the
-    one free choice in the whole game.</p>
+  <p class="small">Red bar = how often the average strategy bets. Where theory pins a
+    value exactly, a marker shows it. The Jack gets a striped band instead, because
+    any bluffing rate inside that range is equally optimal. It is the one free choice
+    in the whole game.</p>
   <div class="box stack">
     <div id="opens"></div>
     <div class="controls" style="margin-top:3px">
@@ -465,34 +466,34 @@ a{ color:var(--teal); font-weight:600; }
 
 <!-- ================= convergence ================= -->
 <section>
-  <h2>Is it actually converging?</h2>
+  <h2>Is it really converging?</h2>
   <div class="box stack">
-    <p><b>Exploitability</b> is the honest test: compute the best possible
-      counter-strategy to what the program currently plays, and see how much it
-      wins. At a true equilibrium no counter-strategy gains anything, so this hits
-      zero. It is computed here by brute force over all 64 pure strategies per
-      side — no estimation.</p>
+    <p>Exploitability is the honest test. Compute the best possible counter-strategy
+      to whatever the program currently plays, then see how much that counter wins. At
+      a true equilibrium no counter-strategy gains anything, so the number goes to
+      zero. The figure here comes from brute force over all 64 pure strategies per
+      side, with nothing estimated.</p>
     <canvas class="cv" id="cv"></canvas>
     <div class="legend">
       <span><i style="border-color:var(--red)"></i>exploitability</span>
       <span><i style="border-color:var(--ink-2)"></i>|game value − (−1/18)|</span>
     </div>
-    <p class="small">Both axes are logarithmic; the straight-line fall is the
-      <span class="m">1/√T</span> rate the theorem promises. It starts at
-      <span class="m">0.92</span> chips per hand — a uniform random strategy is
-      enormously exploitable — and 50,000 iterations bring it under
+    <p class="small">Both axes are logarithmic, so the straight-line fall is the
+      <span class="m">1/√T</span> rate the theorem promises. It starts around
+      <span class="m">0.92</span> chips per hand, since a uniform random strategy is
+      very easy to take apart, and 50,000 iterations bring it under
       <span class="m">0.01</span>.</p>
     <dl class="facts">
-      <dt>game value</dt><dd><span class="m" id="f-gv">—</span>, against an exact
+      <dt>game value</dt><dd><span class="m" id="f-gv">0.0000</span>, against an exact
         <span class="m">−1/18 = −0.0556</span> for P1. The first player loses
         slightly, and cannot avoid it.</dd>
-      <dt>P2 strategy</dt><dd>unique — all six of its information sets have exactly
-        one equilibrium value, so they can be checked one by one</dd>
+      <dt>P2 strategy</dt><dd>unique. All six of its information sets have exactly one
+        equilibrium value, so they can be checked one by one</dd>
       <dt>P1 strategy</dt><dd>a one-parameter family. Let α = how often P1 bets the
         Jack; any α in <span class="m">[0, ⅓]</span> is optimal, provided the rest
         follows along</dd>
       <dt>the couplings</dt><dd>bet the King at <span class="m">3α</span>, call with
-        the Queen at <span class="m">α + ⅓</span>. Nobody puts these ratios in — they
+        the Queen at <span class="m">α + ⅓</span>. Nobody puts these ratios in. They
         fall out of the regret updates</dd>
     </dl>
   </div>
@@ -506,7 +507,7 @@ a{ color:var(--teal); font-weight:600; }
 
 <div class="foot">
   <span class="tiny">Every number on this page is computed live by the same
-    algorithm as <span class="m">kuhn_cfr.py</span> in this repository — in
+    algorithm as <span class="m">kuhn_cfr.py</span> in this repository. In
     deterministic mode the two agree to eight decimal places.</span>
   <a href="detail.html">Full instrument: tree, tape, all twelve ledgers →</a>
 </div>
@@ -515,7 +516,7 @@ a{ color:var(--teal); font-weight:600; }
 <script>
 "use strict";
 /* ===================================================================== *
- * CFR core — same maths as kuhn_cfr.py
+ * CFR core: same math as kuhn_cfr.py
  * ===================================================================== */
 const RANKS = ["J","Q","K"], PASS = 0, BET = 1, ACTIONS = ["p","b"], NA = 2;
 const TERMINALS = new Set(["pp","bp","bb","pbp","pbb"]);
@@ -649,7 +650,7 @@ function newHand(){
 }
 
 /* ===================================================================== *
- * render — table
+ * render: the table
  * ===================================================================== */
 const $ = id => document.getElementById(id);
 const NAME = ["Jack","Queen","King"];
@@ -677,7 +678,7 @@ function renderHand(){
   for (const pl of [0,1]){
     const mine = H.acts.filter((a,i) => a.pl === pl && i < shown);
     const el = $(pl === 0 ? "a-p1" : "a-p2");
-    if (!mine.length){ el.className = "badge wait"; el.textContent = "—"; }
+    if (!mine.length){ el.className = "badge wait"; el.textContent = "to act"; }
     else { const last = mine[mine.length-1];
       el.className = "badge " + (last.a === BET ? "bet" : "pass");
       el.textContent = last.a === BET ? "BET" : "PASS"; }
@@ -690,7 +691,7 @@ function renderHand(){
   let say = "";
   if (phase === "deal")
     say = `P1 is dealt the <b>${NAME[H.cards[0]]}</b>. Its information set is `
-        + `<span class="m">${RANKS[H.cards[0]]}</span> — the card, and no betting yet.`;
+        + `<span class="m">${RANKS[H.cards[0]]}</span>: the card, with no betting yet.`;
   else if (phase.startsWith("act")){
     const i = +phase.slice(3), a = H.acts[i], who = a.pl === 0 ? "P1" : "P2";
     const verb = a.a === BET ? "bets"
@@ -699,15 +700,15 @@ function renderHand(){
         + `<span class="m">[${fx(a.s[0],2)} pass, ${fx(a.s[1],2)} bet]</span> at `
         + `information set <span class="m">${infoKey(a.h, H.cards)}</span>.`;
     if (a.pl === 0 && a.a === BET && H.cards[0] === 0)
-      say += " Betting the worst card in the deck — a bluff, and the equilibrium"
-           + " calls for exactly this some of the time.";
+      say += " Betting the worst card in the deck. That is a bluff, and the"
+           + " equilibrium calls for it some of the time.";
   } else {
     const c = H.chips;
     const why = H.h === "pp"
       ? `Neither bet, so it is a showdown for 1 chip.`
       : H.h === "bp" ? "P2 folded to the bet."
       : H.h === "pbp" ? "P1 folded to the bet."
-      : "The bet was called — showdown for 2 chips.";
+      : "The bet was called, so it goes to a showdown for 2 chips.";
     say = `${why} <span class="result ${c > 0 ? "win" : "lose"}">`
         + `${c > 0 ? "+" : "−"}${Math.abs(c)} chip${Math.abs(c) === 1 ? "" : "s"} `
         + `to P1</span>. The tree walk now updates every information set it touched.`;
@@ -733,9 +734,9 @@ function renderMath(){
   const L = (lab, v) => pad(lab, 9) + v;
 
   $("math-h").innerHTML = `The arithmetic at <span class="m">${e.key}</span>`
-    + ` — P1 holding the ${NAME[H.cards[0]]}`;
+    + `, P1 holding the ${NAME[H.cards[0]]}`;
   $("math-body").innerHTML =
-`<span class="c">1 · regret matching — turn the ledger into a mix</span>
+`<span class="c">1 · regret matching: turn the ledger into a mix</span>
 ${L("R", `= [${fx(r[0])}, ${fx(r[1])}]`)}
 ${L("R⁺", `= [${fx(pos[0])}, ${fx(pos[1])}]`)}
 ${L("ΣR⁺", `= ${fx(e.rm.total)}`)}
@@ -747,7 +748,7 @@ ${L("u(bet)", `= ${fx(u[1])}`)}
 ${L("u_σ", `= ${fx(s[0])}·${fx(u[0])} + ${fx(s[1])}·${fx(u[1])} = <span class="hi">${fx(e.uSigma)}</span>`)}
 <span class="c">          the baseline: what the current mix is worth here</span>
 
-<span class="c">3 · counterfactual regret — weighted by P2's reach, not P1's</span>
+<span class="c">3 · counterfactual regret, weighted by P2's reach rather than P1's</span>
 ${L("π_opp", `= ${fx(e.oppReach)}`)}
 <span class="p">pass</span>     ${fx(e.oppReach)} · (${fx(u[0])} − ${fx(e.uSigma)}) = ${fx(e.delta[0])}
 <span class="b">bet</span>      ${fx(e.oppReach)} · (${fx(u[1])} − ${fx(e.uSigma)}) = ${fx(e.delta[1])}
@@ -760,25 +761,25 @@ ${L("R", applied
     ? `Here <span class="m">${dom}</span> beat the baseline, so its regret rose and
        its share of the mix will grow. `
     : `The two actions came out equal, so neither regret moves. `)
-    + `The two deltas always sum to zero against the baseline — regret
-       redistributes between actions rather than inflating. And this is one
-       iteration out of hundreds of thousands: a single hand routinely points away
-       from the equilibrium, which is exactly why the <em>average</em> strategy is
-       the answer and the current mix is not.`;
+    + `The two deltas always sum to zero against the baseline, which means regret
+       gets redistributed between the actions rather than inflated. Keep in mind this
+       is one iteration out of hundreds of thousands. A single hand often points away
+       from the equilibrium, and that is why the answer comes from the average
+       strategy rather than the current mix.`;
 }
 
 /* ---------- opening ledgers ---------- */
 const OPENS = [
-  { k:"K", nm:"King — the best card" },
-  { k:"Q", nm:"Queen — the trap card" },
-  { k:"J", nm:"Jack — the bluffing card" }
+  { k:"K", nm:"King, the best card" },
+  { k:"Q", nm:"Queen, the trap card" },
+  { k:"J", nm:"Jack, the bluffing card" }
 ];
 $("opens").innerHTML = OPENS.map(o => `
   <div class="iset">
     <div class="card sm"><span class="cn">${o.k}</span><span class="mid">${o.k}</span></div>
     <div class="bars">
       <div class="top"><span class="nm">${o.nm}</span>
-        <span class="vv" id="v-${o.k}">—</span></div>
+        <span class="vv" id="v-${o.k}"></span></div>
       <div class="track"><span class="zone" id="z-${o.k}"></span>
         <i id="b-${o.k}"></i><span class="tick" id="t-${o.k}"></span></div>
     </div>
@@ -792,7 +793,7 @@ $("grid12").innerHTML = ORDER.map(k => {
   const hist = k.slice(1);
   return `<div class="cellset">
     <div class="k"><b>${k[0]}<span style="opacity:.55">${hist || "·"}</span></b>
-      <span id="g-${k}-v">—</span></div>
+      <span id="g-${k}-v"></span></div>
     <div class="mini"><i id="g-${k}"></i><span class="tick" id="gt-${k}"></span></div>
     <span class="tiny">${CTX[hist]}</span>
   </div>`;
@@ -810,7 +811,7 @@ function renderLedgers(){
     const tgt = o.k === "Q" ? 0 : o.k === "K" ? dyn.K : alpha;
     $("v-"+o.k).textContent = `bets ${(p*100).toFixed(1)}%`
       + (o.k === "K" ? `   ·  target 3α = ${(dyn.K*100).toFixed(1)}%` : "")
-      + (o.k === "J" ? `   ·  this is α — any value in [0, 33.3%] is optimal` : "")
+      + (o.k === "J" ? `   ·  this is α, and any value in [0, 33.3%] is optimal` : "")
       + (o.k === "Q" ? `   ·  target 0%` : "");
     const tk = $("t-"+o.k);
     if (o.k === "J"){ tk.style.display = "none"; }
@@ -842,34 +843,33 @@ function renderFound(alpha){
               Qpb:avgStrategy(S.nodes.Qpb)[BET] };
   const ready = S.iter >= 500;
   const items = ready ? [
-    ["K", "Bet the King almost always — but not quite always.",
-     `Currently ${(p.K*100).toFixed(0)}%. Betting the best hand is obvious; the
-      subtlety is <em>why not 100%</em>. The King's betting rate is chained to the
-      bluffing rate at exactly <span class="m">3α = ${(3*alpha*100).toFixed(0)}%</span>.
-      Bluff more and you must bet the King more, or an opponent could read a bet as
-      weak and call you down.`],
+    ["K", "Bet the King almost always, but not quite always.",
+     `Currently ${(p.K*100).toFixed(0)}%. Betting the best hand is the obvious part.
+      The subtlety is why it stops short of 100%. The King's betting rate is chained
+      to the bluffing rate at <span class="m">3α = ${(3*alpha*100).toFixed(0)}%</span>.
+      Bluff more and you have to bet the King more as well, or an opponent could start
+      reading a bet as weak and call you down.`],
     ["Q", "Never bet the Queen, but call with it a third of the time.",
      `Opening: ${(p.Q*100).toFixed(1)}%. A Queen bet only ever gets called by a King,
-      which beats it — betting turns a hand that might win a showdown into a hand
-      that only wins when it was already ahead. So it checks. Facing a bet later it
-      calls ${(p.Qpb*100).toFixed(0)}% of the time, which theory pins at
-      <span class="m">α + ⅓ = ${((alpha+1/3)*100).toFixed(0)}%</span> — just often
-      enough that bluffing the Jack cannot become profitable.`],
-    ["J", "Bluff the Jack — the worst card in the deck.",
+      which beats it. Betting turns a hand that might have won a showdown into a hand
+      that only wins when it was already ahead, so it checks instead. Facing a bet
+      later it calls ${(p.Qpb*100).toFixed(0)}% of the time, which theory pins at
+      <span class="m">α + ⅓ = ${((alpha+1/3)*100).toFixed(0)}%</span>, just often
+      enough that bluffing the Jack never becomes profitable.`],
+    ["J", "Bluff the Jack, the worst card in the deck.",
      `Currently ${(p.J*100).toFixed(1)}%. This is the result that surprises people.
-      A hand that cannot win a showdown is still bet sometimes, because it wins the
-      pot outright when the opponent folds. Nobody encoded this. It appears because
-      regret matching never lets an action with positive regret drop to zero
-      probability, and folding to every bet would be exploitable.`]
+      A hand that cannot win a showdown still gets bet sometimes, because it wins the
+      pot outright when the opponent folds. Nobody encoded that. It appears because
+      regret matching never lets an action with positive regret fall to zero
+      probability, and because folding to every bet would itself be exploitable.`]
   ] : [];
   $("found").innerHTML = ready
     ? items.map(([k,t,d]) => `<div class="iset" style="align-items:start">
         <div class="card sm"><span class="cn">${k}</span><span class="mid">${k}</span></div>
         <div><h3>${t}</h3><p class="small">${d}</p></div></div>`).join("")
-      + `<p class="small"><b>None of these were programmed.</b> The input was the
-         rules of the game and one update rule. Everything above — when to bluff,
-         when to trap, and the exact ratios linking them — is what falls out of
-         driving regret to zero.</p>`
+      + `<p class="small">None of these were programmed. The input was the rules of
+         the game plus one update rule. Every habit above, including the exact ratios
+         tying them together, falls out of driving regret to zero.</p>`
     : `<p class="small">Run at least 500 iterations and the three learned rules,
        with the reasoning behind each, will appear here.</p>`;
 }
@@ -935,10 +935,17 @@ function advance(){
   renderHand(); renderMath();
 }
 function fast(n){ stopAuto(); train(n); renderLedgers(); }
-function startAuto(){ S.auto = true; $("b-auto").classList.add("on");
-  $("b-auto").textContent = "Stop"; S.timer = setInterval(advance, 1000); }
+/* plays out exactly one iteration and stops, rather than looping until stopped */
+function startAuto(){
+  S.auto = true; $("b-auto").classList.add("on"); $("b-auto").textContent = "Stop";
+  S.timer = setInterval(() => {
+    advance();
+    if (S.hand.steps[S.hand.si] === "update") stopAuto();
+  }, 1100);
+}
 function stopAuto(){ S.auto = false; $("b-auto").classList.remove("on");
-  $("b-auto").textContent = "Auto"; clearInterval(S.timer); S.timer = null; }
+  $("b-auto").textContent = "Run one iteration";
+  clearInterval(S.timer); S.timer = null; }
 
 $("b-next").onclick = () => { stopAuto(); advance(); };
 $("b-auto").onclick = () => S.auto ? stopAuto() : startAuto();
@@ -952,7 +959,7 @@ $("b-reset").onclick = () => {
   S.hand = null; S.samples = []; nextSample = 1;
   setCard($("c-p1"), 0, false); setCard($("c-p2"), 0, false);
   for (const id of ["a-p1","a-p2"]){
-    $(id).className = "badge wait"; $(id).textContent = "—"; }
+    $(id).className = "badge wait"; $(id).textContent = "to act"; }
   setPot(0,2); $("hist").textContent = "";
   $("narrate").textContent = "Deal a hand to begin.";
   $("b-next").textContent = "Deal";
