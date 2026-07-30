@@ -3,443 +3,588 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Kuhn Poker CFR — the calculation, step by step</title>
+<title>How CFR learns to play poker perfectly</title>
 
 <style>
-/* ---------- reset ----------------------------------------------------- */
+/* ---------- reset ---------- */
 *,*::before,*::after{ box-sizing:border-box; }
 html{ -webkit-text-size-adjust:100%; }
-body,h1,h3,p{ margin:0; }
-button,select{ font:inherit; color:inherit; }
-canvas,svg{ display:block; }
+body,h1,h2,h3,p,ul,ol,li,figure{ margin:0; padding:0; }
+ul,ol{ list-style:none; }
+button{ font:inherit; color:inherit; }
+canvas{ display:block; }
 
-/* ---------- tokens ---------------------------------------------------- */
+/* ---------- tokens ---------- */
 :root{
-  --stock:#E6E4DE; --card:#F4F3EF; --card-2:#EDEBE4; --sunk:#DEDBD3;
-  --ink:#16151A;   --ink-2:#4A4852; --ink-3:#7C7A85;
-  --red:#B22A32;   --red-2:#8E2129; --red-wash:rgba(178,42,50,.10);
-  --rule:#C9C6BD;  --hair:#D8D5CC;  --grid:#D3D0C7;
-  --live:#16151A;  --live-wash:rgba(22,21,26,.055);
-  --pos:#2F6F5E;   --neg:#96323A;
-  --shadow:0 1px 0 rgba(22,21,26,.05), 0 1px 6px rgba(22,21,26,.045);
+  --paper:#FDF7EA; --panel:#FFFFFF; --panel-2:#F6EEDC; --sunk:#E8DCC2;
+  --ink:#1B2A4A;   --ink-2:#4E5C78; --ink-3:#8A93A6;
+  --red:#C93B36;   --gold:#DF9A25;  --teal:#26766A;
+  --line:#E2D6BC;  --shadow:0 1px 0 #EDE3CD, 0 5px 18px rgba(27,42,74,.06);
+  --card-face:#FFFFFF; --card-edge:#D8CBB0; --card-ink:#1B2A4A;
+  --win:#26766A;   --lose:#B84B45;  --grid:#E6DCC6;
 }
 @media (prefers-color-scheme: dark){
   :root{
-    --stock:#141317; --card:#1D1C21; --card-2:#24232A; --sunk:#101014;
-    --ink:#EDEAE2;   --ink-2:#A9A6AE; --ink-3:#77747E;
-    --red:#E0555C;   --red-2:#F0787E; --red-wash:rgba(224,85,92,.13);
-    --rule:#34323B;  --hair:#2A2830;  --grid:#2C2A33;
-    --live:#EDEAE2;  --live-wash:rgba(237,234,226,.07);
-    --pos:#5FAF97;   --neg:#D9666E;
-    --shadow:0 1px 0 rgba(0,0,0,.3), 0 1px 6px rgba(0,0,0,.25);
+    --paper:#12192A; --panel:#1B2335; --panel-2:#212A3E; --sunk:#2A3350;
+    --ink:#EFE8DA;   --ink-2:#AFB8CC; --ink-3:#79839B;
+    --red:#EE7B74;   --gold:#E8B056;  --teal:#4FB0A1;
+    --line:#2C3550;  --shadow:0 5px 18px rgba(0,0,0,.34);
+    --card-face:#F4EEE1; --card-edge:#0E1320; --card-ink:#1B2A4A;
+    --win:#4FB0A1;   --lose:#EE7B74;  --grid:#293252;
   }
 }
 :root[data-theme="dark"]{
-  --stock:#141317; --card:#1D1C21; --card-2:#24232A; --sunk:#101014;
-  --ink:#EDEAE2;   --ink-2:#A9A6AE; --ink-3:#77747E;
-  --red:#E0555C;   --red-2:#F0787E; --red-wash:rgba(224,85,92,.13);
-  --rule:#34323B;  --hair:#2A2830;  --grid:#2C2A33;
-  --live:#EDEAE2;  --live-wash:rgba(237,234,226,.07);
-  --pos:#5FAF97;   --neg:#D9666E;
-  --shadow:0 1px 0 rgba(0,0,0,.3), 0 1px 6px rgba(0,0,0,.25);
+  --paper:#12192A; --panel:#1B2335; --panel-2:#212A3E; --sunk:#2A3350;
+  --ink:#EFE8DA;   --ink-2:#AFB8CC; --ink-3:#79839B;
+  --red:#EE7B74;   --gold:#E8B056;  --teal:#4FB0A1;
+  --line:#2C3550;  --shadow:0 5px 18px rgba(0,0,0,.34);
+  --card-face:#F4EEE1; --card-edge:#0E1320; --card-ink:#1B2A4A;
+  --win:#4FB0A1;   --lose:#EE7B74;  --grid:#293252;
 }
 :root[data-theme="light"]{
-  --stock:#E6E4DE; --card:#F4F3EF; --card-2:#EDEBE4; --sunk:#DEDBD3;
-  --ink:#16151A;   --ink-2:#4A4852; --ink-3:#7C7A85;
-  --red:#B22A32;   --red-2:#8E2129; --red-wash:rgba(178,42,50,.10);
-  --rule:#C9C6BD;  --hair:#D8D5CC;  --grid:#D3D0C7;
-  --live:#16151A;  --live-wash:rgba(22,21,26,.055);
-  --pos:#2F6F5E;   --neg:#96323A;
-  --shadow:0 1px 0 rgba(22,21,26,.05), 0 1px 6px rgba(22,21,26,.045);
+  --paper:#FDF7EA; --panel:#FFFFFF; --panel-2:#F6EEDC; --sunk:#E8DCC2;
+  --ink:#1B2A4A;   --ink-2:#4E5C78; --ink-3:#8A93A6;
+  --red:#C93B36;   --gold:#DF9A25;  --teal:#26766A;
+  --line:#E2D6BC;  --shadow:0 1px 0 #EDE3CD, 0 5px 18px rgba(27,42,74,.06);
+  --card-face:#FFFFFF; --card-edge:#D8CBB0; --card-ink:#1B2A4A;
+  --win:#26766A;   --lose:#B84B45;  --grid:#E6DCC6;
 }
-
 :root{
-  --f-ui:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
-  --f-mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
-  --f-card:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+  --f:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,system-ui,sans-serif;
+  --f-card:"Iowan Old Style",Georgia,"Times New Roman",serif;
+  --f-m:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
 }
 
-/* ---------- frame ----------------------------------------------------- */
-body{ background:var(--stock); color:var(--ink); font-family:var(--f-ui);
-      -webkit-font-smoothing:antialiased; }
-.wrap{ max-width:1240px; margin:0 auto; padding:26px 20px 56px;
-       display:flex; flex-direction:column; gap:18px; }
-.mono{ font-family:var(--f-mono); font-variant-numeric:tabular-nums; }
-.eyebrow{ font-size:10.5px; letter-spacing:.15em; text-transform:uppercase;
-          color:var(--ink-3); font-weight:600; }
+body{ background:var(--paper); color:var(--ink); font-family:var(--f);
+      line-height:1.62; -webkit-font-smoothing:antialiased; }
+.page{ max-width:790px; margin:0 auto; padding:34px 18px 72px;
+       display:flex; flex-direction:column; gap:30px; }
 
-/* masthead */
-.mast{ display:flex; flex-wrap:wrap; align-items:flex-end; gap:14px 24px;
-       border-bottom:1px solid var(--rule); padding-bottom:16px; }
-.mast h1{ font-size:23px; font-weight:600; letter-spacing:-.015em;
-          text-wrap:balance; line-height:1.2; }
-.mast h1 em{ font-style:normal; color:var(--red); }
-.mast p{ font-size:13.5px; color:var(--ink-2); max-width:56ch; line-height:1.5; }
+/* ---------- type ---------- */
+h1{ font-size:clamp(28px,5.4vw,40px); line-height:1.1; font-weight:750;
+    letter-spacing:-.022em; text-wrap:balance; }
+h2{ font-size:clamp(20px,3.3vw,25px); font-weight:700; letter-spacing:-.014em;
+    text-wrap:balance; line-height:1.24; }
+h3{ font-size:16.5px; font-weight:700; letter-spacing:-.005em; }
+.lede{ font-size:clamp(16.5px,2.3vw,18.5px); color:var(--ink-2); max-width:46ch; }
+p{ max-width:66ch; }
+.q{ font-size:clamp(17px,2.6vw,19.5px); font-weight:600; line-height:1.45;
+    border-left:3px solid var(--gold); padding-left:15px; text-wrap:balance;
+    max-width:52ch; }
+.small{ font-size:14.5px; color:var(--ink-2); }
+.tiny{ font-size:12.5px; color:var(--ink-3); }
+.eyebrow{ font-size:11px; letter-spacing:.15em; text-transform:uppercase;
+          font-weight:700; color:var(--ink-3); }
+b,strong{ font-weight:670; }
+.m{ font-family:var(--f-m); font-variant-numeric:tabular-nums; }
 
-/* readout strip */
-.readout{ display:grid; grid-template-columns:repeat(auto-fit,minmax(148px,1fr));
-          gap:1px; background:var(--rule); border:1px solid var(--rule);
-          border-radius:3px; overflow:hidden; }
-.cell{ background:var(--card); padding:11px 13px; display:flex;
-       flex-direction:column; gap:5px; }
-.cell .k{ font-size:10px; letter-spacing:.12em; text-transform:uppercase;
-          color:var(--ink-3); font-weight:600; }
-.cell .v{ font-family:var(--f-mono); font-variant-numeric:tabular-nums;
-          font-size:19px; letter-spacing:-.02em; }
-.cell .n{ font-size:11px; color:var(--ink-3); font-family:var(--f-mono); }
-.cell .v.red{ color:var(--red); }
+/* ---------- panels ---------- */
+.box{ background:var(--panel); border:1px solid var(--line); border-radius:14px;
+      padding:22px; box-shadow:var(--shadow); }
+.stack{ display:flex; flex-direction:column; gap:15px; }
+.stack.tight{ gap:9px; }
+section{ display:flex; flex-direction:column; gap:15px; }
 
-/* controls */
-.bar{ display:flex; flex-wrap:wrap; gap:8px; align-items:center;
-      padding:10px 12px; background:var(--card); border:1px solid var(--rule);
-      border-radius:3px; box-shadow:var(--shadow); }
-button{ font-family:var(--f-ui); font-size:12.5px; font-weight:550; color:var(--ink);
-        background:var(--card-2); border:1px solid var(--rule); border-radius:2px;
-        padding:6px 11px; cursor:pointer; letter-spacing:.01em; }
+/* math block */
+.math{ font-family:var(--f-m); font-variant-numeric:tabular-nums; font-size:13.5px;
+       line-height:1.85; background:var(--panel-2); border:1px solid var(--line);
+       border-radius:10px; padding:14px 16px; overflow-x:auto; white-space:pre;
+       color:var(--ink); }
+.math .c{ color:var(--ink-3); }
+.math .b{ color:var(--red); }
+.math .p{ color:var(--ink-2); }
+.math .hi{ background:color-mix(in srgb, var(--gold) 26%, transparent);
+           border-radius:3px; padding:0 2px; }
+.defn{ display:grid; grid-template-columns:auto minmax(0,1fr); gap:6px 13px;
+       font-size:14.5px; align-items:baseline; }
+.defn dt{ font-family:var(--f-m); font-size:13px; color:var(--red);
+          font-weight:600; white-space:nowrap; }
+.defn dd{ color:var(--ink-2); }
+
+/* numbered steps that mean something (the loop really is ordered) */
+.steps{ counter-reset:s; display:flex; flex-direction:column; gap:15px; }
+.steps li{ counter-increment:s; display:grid; grid-template-columns:26px minmax(0,1fr);
+           gap:13px; align-items:start; }
+.steps li::before{ content:counter(s); font-family:var(--f-m); font-size:12px;
+  font-weight:700; color:var(--paper); background:var(--ink); width:22px; height:22px;
+  border-radius:50%; display:grid; place-items:center; margin-top:3px; }
+
+/* ---------- cards ---------- */
+.card{ position:relative; background:var(--card-face);
+       border:1px solid var(--card-edge); border-radius:8px;
+       width:60px; height:86px; flex:0 0 auto; display:grid; place-items:center;
+       box-shadow:0 1px 3px rgba(27,42,74,.16); }
+.card .mid{ font-family:var(--f-card); font-size:34px; font-weight:700;
+            color:var(--card-ink); line-height:1; }
+.card .cn{ position:absolute; top:3px; left:5px; font-family:var(--f-card);
+           font-size:12px; font-weight:700; color:var(--card-ink); opacity:.55; }
+.card.sm{ width:44px; height:63px; }
+.card.sm .mid{ font-size:25px; }
+.card.back .mid,.card.back .cn{ visibility:hidden; }
+.card.back{ background:repeating-linear-gradient(45deg,
+   var(--sunk) 0 5px, var(--panel-2) 5px 10px); border-color:var(--line); }
+.ladder{ display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
+.ladder .gt{ font-size:14px; font-weight:700; color:var(--ink-3); }
+.rk{ display:flex; flex-direction:column; align-items:center; gap:4px; }
+.rk .w{ font-size:12px; font-weight:600; color:var(--ink-2); }
+
+/* ---------- chips / table ---------- */
+.chips{ display:flex; gap:3px; align-items:center; flex-wrap:wrap; min-height:18px; }
+.chip{ width:16px; height:16px; border-radius:50%; background:var(--gold);
+       border:2px solid color-mix(in srgb, var(--gold) 62%, #000 38%); flex:0 0 auto; }
+.chip.ghost{ background:transparent; border-style:dashed; border-color:var(--ink-3); }
+.felt{ background:var(--panel-2); border:1px solid var(--line); border-radius:14px;
+       padding:16px; display:flex; flex-direction:column; gap:13px; }
+.seat{ display:flex; align-items:center; gap:13px; }
+.seat .who{ display:flex; flex-direction:column; align-items:center; gap:1px;
+            width:58px; flex:0 0 auto; }
+.seat .face{ font-size:27px; line-height:1.1; }
+.seat .nm{ font-size:11.5px; font-weight:700; }
+.seat .rl{ font-size:10.5px; color:var(--ink-3); font-family:var(--f-m); }
+.seat .act{ margin-left:auto; }
+.badge{ display:inline-block; padding:4px 11px; border-radius:999px;
+        font-size:13.5px; font-weight:700; }
+.badge.bet{ background:var(--red); color:#fff; }
+.badge.pass{ background:var(--sunk); color:var(--ink); }
+.badge.wait{ background:transparent; color:var(--ink-3);
+             border:1px dashed var(--line); }
+.pot{ display:flex; align-items:center; gap:11px; justify-content:center;
+      padding:9px; border-top:1px dashed var(--line);
+      border-bottom:1px dashed var(--line); }
+.pot .lab{ font-size:12px; font-weight:700; color:var(--ink-3);
+           letter-spacing:.04em; text-transform:uppercase; }
+.hist{ font-family:var(--f-m); font-size:12.5px; color:var(--ink-3); }
+.speech{ background:var(--panel); border:1px solid var(--line); border-radius:11px;
+         padding:12px 15px; }
+.result.win{ color:var(--win); font-weight:670; }
+.result.lose{ color:var(--lose); font-weight:670; }
+
+/* ---------- controls ---------- */
+.controls{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+button{ background:var(--panel-2); border:1px solid var(--line); border-radius:9px;
+        padding:8px 14px; font-weight:600; font-size:14px; cursor:pointer; }
 button:hover{ background:var(--sunk); }
 button:active{ transform:translateY(.5px); }
-button:focus-visible{ outline:2px solid var(--red); outline-offset:1px; }
-button[disabled]{ opacity:.4; cursor:default; }
-button.prime{ background:var(--ink); color:var(--stock); border-color:var(--ink); }
-button.prime:hover{ background:var(--ink-2); border-color:var(--ink-2); }
-.bar .sep{ width:1px; align-self:stretch; background:var(--hair); margin:0 3px; }
-.bar label{ font-size:11.5px; color:var(--ink-2); display:flex; gap:6px;
-            align-items:center; min-width:0; }
-.bar label select{ min-width:0; max-width:100%; }
-select{ font-family:var(--f-ui); font-size:12px; color:var(--ink);
-        background:var(--card-2); border:1px solid var(--rule);
-        border-radius:2px; padding:5px 7px; }
-select:focus-visible{ outline:2px solid var(--red); outline-offset:1px; }
+button:focus-visible{ outline:2px solid var(--gold); outline-offset:2px; }
+button.go{ background:var(--teal); border-color:var(--teal); color:#fff;
+           font-size:15px; padding:9px 18px; }
+button.go:hover{ filter:brightness(1.09); }
+button.on{ background:var(--gold); border-color:var(--gold); color:#221805; }
+.counter{ font-family:var(--f-m); font-size:13px; color:var(--ink-2);
+          margin-left:auto; }
 
-/* panels */
-.panel{ background:var(--card); border:1px solid var(--rule); border-radius:3px;
-        box-shadow:var(--shadow); display:flex; flex-direction:column;
-        min-width:0; overflow:hidden; }
-.phead{ display:flex; justify-content:space-between; align-items:baseline;
-        gap:12px; padding:10px 13px; border-bottom:1px solid var(--hair); }
-.phead .t{ font-size:12.5px; font-weight:600; letter-spacing:-.005em; }
-.pbody{ padding:13px; min-width:0; }
-
-.stage{ display:grid; grid-template-columns:minmax(0,1.42fr) minmax(0,1fr);
-        gap:18px; align-items:start; }
-@media (max-width:940px){ .stage{ grid-template-columns:minmax(0,1fr); } }
-
-/* tree */
-.treewrap{ overflow-x:auto; }
-svg.tree{ display:block; width:100%; min-width:600px; height:auto; }
-.hand{ display:flex; gap:14px; align-items:center; font-size:11.5px;
-       color:var(--ink-2); }
-.pip{ display:inline-flex; align-items:baseline; gap:5px; }
-.pip .rk{ font-family:var(--f-card); font-size:16px; line-height:1;
-          font-weight:600; }
-.pip .who{ font-size:10px; letter-spacing:.1em; text-transform:uppercase;
-           color:var(--ink-3); font-weight:600; }
-
-/* tape */
-.tape{ height:456px; overflow-y:auto; padding:0; }
-.blk{ padding:9px 13px; border-bottom:1px solid var(--hair); }
-.blk.now{ background:var(--live-wash); }
-.blk .ph{ font-size:9.5px; letter-spacing:.14em; text-transform:uppercase;
-          color:var(--ink-3); font-weight:700; margin-bottom:5px;
-          display:flex; justify-content:space-between; gap:8px; }
-.blk .ph .at{ color:var(--ink-3); letter-spacing:.02em; text-transform:none;
-              font-weight:600; font-family:var(--f-mono); }
-.blk .eq{ font-family:var(--f-mono); font-variant-numeric:tabular-nums;
-          font-size:12px; line-height:1.62; white-space:pre; overflow-x:auto;
-          color:var(--ink); }
-.blk .cm{ font-size:11.5px; color:var(--ink-2); line-height:1.45; margin-top:4px;
-          white-space:normal; }
-.tape .b{ color:var(--red); }  /* bet  */
-.tape .p{ color:var(--ink-2); } /* pass */
-.tape .em{ font-weight:700; }
-
-/* ledger */
-.groups{ display:grid; grid-template-columns:repeat(auto-fit,minmax(232px,1fr));
-         gap:1px; background:var(--rule); }
-.grp{ background:var(--card); padding:12px 13px 14px; display:flex;
-      flex-direction:column; gap:10px; }
-.grp .gh{ display:flex; flex-direction:column; gap:2px; }
-.grp .gh .who{ font-size:10px; letter-spacing:.12em; text-transform:uppercase;
-               color:var(--ink-3); font-weight:700; }
-.grp .gh .ctx{ font-size:11.5px; color:var(--ink-2); }
-.iset{ display:grid; grid-template-columns:34px minmax(0,1fr); gap:9px;
+/* ---------- ledger ---------- */
+.iset{ display:grid; grid-template-columns:46px minmax(0,1fr); gap:12px;
        align-items:center; }
-.iset .key{ display:flex; flex-direction:column; align-items:flex-start; }
-.iset .key .rk{ font-family:var(--f-card); font-size:17px; line-height:1;
-                font-weight:600; }
-.iset .key .hs{ font-family:var(--f-mono); font-size:9.5px; color:var(--ink-3); }
-.iset .bars{ display:flex; flex-direction:column; gap:3px; min-width:0; }
-.sbar{ position:relative; height:15px; background:var(--sunk); border-radius:1px;
+.iset + .iset{ margin-top:12px; }
+.bars{ display:flex; flex-direction:column; gap:4px; min-width:0; }
+.bars .top{ display:flex; justify-content:space-between; gap:10px;
+            align-items:baseline; font-size:13.5px; }
+.bars .nm{ font-weight:600; }
+.bars .vv{ font-family:var(--f-m); font-size:12.5px; color:var(--ink-2); }
+.track{ height:19px; background:var(--sunk); border-radius:5px; position:relative;
+        overflow:hidden; }
+.track .zone{ position:absolute; top:0; bottom:0; background:
+   repeating-linear-gradient(45deg,transparent 0 4px,
+   color-mix(in srgb,var(--teal) 30%,transparent) 4px 8px); }
+.track i{ position:absolute; top:0; bottom:0; left:0; background:var(--red);
+          transition:width .35s ease; }
+.track .tick{ position:absolute; top:-1px; bottom:-1px; width:2px;
+              background:var(--ink); opacity:.62; }
+
+.grid12{ display:grid; grid-template-columns:repeat(auto-fit,minmax(158px,1fr));
+         gap:11px 16px; }
+.cellset{ display:flex; flex-direction:column; gap:3px; min-width:0; }
+.cellset .k{ display:flex; justify-content:space-between; font-size:12.5px;
+             font-family:var(--f-m); color:var(--ink-2); }
+.cellset .k b{ color:var(--ink); }
+.mini{ height:10px; background:var(--sunk); border-radius:3px; position:relative;
        overflow:hidden; }
-.sbar i{ position:absolute; inset:0 auto 0 0; background:var(--ink-2);
-         transition:width .16s ease; }
-.sbar u{ position:absolute; top:0; bottom:0; width:1.5px; background:var(--red);
-         opacity:.85; }
-.sbar b{ position:absolute; right:4px; top:0; line-height:15px; font-size:9.5px;
-         font-family:var(--f-mono); font-variant-numeric:tabular-nums;
-         color:var(--ink); opacity:.85; }
-.tick{ position:absolute; top:-2px; bottom:-2px; width:1px; background:var(--ink);
-       opacity:.5; }
-.tick::after{ content:""; position:absolute; top:-3px; left:-2px;
-              border-left:2.5px solid transparent; border-right:2.5px solid transparent;
-              border-top:3px solid var(--ink); }
-.rbar{ position:relative; height:7px; background:var(--sunk); border-radius:1px; }
-.rbar .z{ position:absolute; top:0; bottom:0; left:50%; width:1px;
-          background:var(--grid); }
-.rbar i{ position:absolute; top:0; bottom:0; transition:all .16s ease; }
-.rlab{ font-size:9.5px; font-family:var(--f-mono); color:var(--ink-3);
-       display:flex; justify-content:space-between; }
+.mini i{ position:absolute; top:0; bottom:0; left:0; background:var(--red);
+         transition:width .35s ease; }
+.mini .tick{ position:absolute; top:-1px; bottom:-1px; width:2px;
+             background:var(--ink); opacity:.6; }
 
-/* charts */
-.charts{ display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr));
-         gap:18px; }
-.cv{ width:100%; height:196px; display:block; }
-.legend{ display:flex; flex-wrap:wrap; gap:12px; font-size:11px;
-         color:var(--ink-2); padding:0 13px 12px; }
+/* ---------- chart ---------- */
+.cv{ width:100%; height:190px; }
+.legend{ display:flex; gap:14px; flex-wrap:wrap; font-size:12.5px;
+         color:var(--ink-2); }
 .legend span{ display:inline-flex; align-items:center; gap:5px; }
-.legend i{ width:15px; height:0; border-top-width:2px; border-top-style:solid;
-           display:inline-block; }
+.legend i{ width:14px; border-top:2px solid; display:inline-block; }
 
-/* footnote */
-.note{ font-size:12.5px; color:var(--ink-2); line-height:1.6; max-width:74ch; }
-.note h3{ font-size:12px; font-weight:600; color:var(--ink); margin-bottom:5px;
-          letter-spacing:.01em; }
-.note code{ font-family:var(--f-mono); font-size:11.5px; background:var(--card-2);
-            padding:1px 4px; border-radius:2px; }
-.note + .note{ margin-top:12px; }
-
-@media (prefers-reduced-motion:reduce){
-  *{ transition:none !important; }
-}
+.facts{ display:grid; grid-template-columns:auto minmax(0,1fr); gap:7px 14px;
+        font-size:14.5px; align-items:baseline; }
+.facts dt{ font-family:var(--f-m); font-size:13px; color:var(--ink-2);
+           white-space:nowrap; }
+.foot{ display:flex; justify-content:space-between; gap:14px; flex-wrap:wrap;
+       align-items:center; border-top:1px solid var(--line); padding-top:16px; }
+a{ color:var(--teal); font-weight:600; }
+@media (prefers-reduced-motion:reduce){ *{ transition:none !important; } }
 </style>
 </head>
 
 <body>
-<div class="wrap">
+<div class="page">
 
-  <div class="mast">
-    <div style="display:flex;flex-direction:column;gap:7px;flex:1 1 380px;min-width:0">
-      <div class="eyebrow">Counterfactual regret minimization · Kuhn poker</div>
-      <h1>Every number the solver touches, in the order it touches them</h1>
-      <p>Three cards, one betting round, twelve information sets. Step the recursion and
-         the tape on the right writes out the arithmetic — reach probabilities down,
-         negated utilities up, regret against the baseline at every node.</p>
+<header class="stack">
+  <span class="eyebrow">Counterfactual Regret Minimization</span>
+  <h1>How a program learns to play poker perfectly</h1>
+  <p class="lede">No opening book, no hand-coded rules, no human games to copy.
+    It plays itself a few hundred thousand times and keeps score of the moves it
+    wishes it had made. That turns out to be enough to reach a strategy nobody
+    can beat.</p>
+</header>
+
+<!-- ================= the game ================= -->
+<section>
+  <h2>The game it is solving</h2>
+  <div class="box stack">
+    <div class="ladder">
+      <div class="rk"><div class="card sm"><span class="cn">K</span><span class="mid">K</span></div><span class="w">high</span></div>
+      <span class="gt">beats</span>
+      <div class="rk"><div class="card sm"><span class="cn">Q</span><span class="mid">Q</span></div><span class="w">middle</span></div>
+      <span class="gt">beats</span>
+      <div class="rk"><div class="card sm"><span class="cn">J</span><span class="mid">J</span></div><span class="w">low</span></div>
     </div>
-    <div class="hand" id="hand"></div>
+    <p><b>Kuhn poker.</b> A three-card deck. Each player antes 1 chip and gets one
+      card. Player&nbsp;1 acts first and may <b>pass</b> or <b>bet</b> 1 chip. Facing
+      a bet you may <b>call</b> or <b>fold</b>; facing a pass the other player may
+      pass (showdown) or bet. Highest card wins the pot at a showdown, and a fold
+      hands the pot over without one.</p>
+    <p>Small enough to solve exactly on paper, which is exactly why it is the
+      standard test case — you can check the program against the known answer. The
+      whole game is five possible endings:</p>
+    <div class="math"><span class="c">history   ending                                    net to the player who just acted</span>
+<span class="p">pp</span>        both pass, showdown for 1 chip            <span class="hi">±1</span>
+<span class="p">bp</span>        bet, fold                                 <span class="hi">+1</span>
+<span class="p">bb</span>        bet, call, showdown for 2 chips           <span class="hi">±2</span>
+<span class="p">pbp</span>       pass, bet, fold                           <span class="hi">+1</span>
+<span class="p">pbb</span>       pass, bet, call, showdown for 2 chips     <span class="hi">±2</span></div>
+    <p>A player never sees the other card, so what they actually know is
+      <b>their own card plus the betting so far</b>. That pair is called an
+      <b>information set</b>. Three cards × four betting situations
+      (<span class="m">"" · p · b · pb</span>) gives this game exactly
+      <b>12 information sets</b> — 12 decisions to get right, and the entire job is
+      picking a pass/bet mix for each one.</p>
+  </div>
+</section>
+
+<!-- ================= what CFR is ================= -->
+<section>
+  <h2>What CFR is</h2>
+
+  <div class="box stack">
+    <h3>The obstacle</h3>
+    <p>You cannot just play the highest-value move, because value depends on what
+      the opponent does — and their best response depends on you. Chase it directly
+      and you get a cycle: you adjust, they adjust, you adjust back. There is no
+      fixed target to hill-climb toward.</p>
+    <p>What you want instead is a <b>Nash equilibrium</b>: a pair of strategies
+      where neither player can improve by changing their own. CFR finds one without
+      ever searching for it directly. It optimizes a different quantity that happens
+      to drag the strategy to equilibrium as a side effect.</p>
   </div>
 
-  <div class="readout" id="readout">
-    <div class="cell"><span class="k">Iterations</span><span class="v" id="ro-it">0</span><span class="n" id="ro-it-n">untrained</span></div>
-    <div class="cell"><span class="k">Game value to P1</span><span class="v" id="ro-gv">+0.1250</span><span class="n">theory −0.0556</span></div>
-    <div class="cell"><span class="k">α · P1 bets the Jack</span><span class="v red" id="ro-a">0.500</span><span class="n">equilibrium 0 – ⅓</span></div>
-    <div class="cell"><span class="k">P1 bets the King</span><span class="v red" id="ro-k">0.500</span><span class="n" id="ro-k-n">vs 3α 1.500</span></div>
-    <div class="cell"><span class="k">Exploitability</span><span class="v" id="ro-ex">0.9167</span><span class="n">0 at equilibrium</span></div>
+  <div class="box stack">
+    <h3>That quantity is regret</h3>
+    <p>At one information set, for one action <span class="m">a</span>, regret
+      answers:</p>
+    <p class="q">How much better off would I have been if I had always played
+      <span class="m">a</span> here, instead of what my strategy actually did?</p>
+    <p>Positive regret means the action is underused. So use it more — literally in
+      proportion to its regret. That rule is <b>regret matching</b>:</p>
+    <div class="math"><span class="hi">σ(a) = R⁺(a) / Σ<sub>a'</sub> R⁺(a')</span>          where R⁺ = max(R, 0)
+
+<span class="c">all regrets ≤ 0  →  fall back to a uniform mix</span></div>
+    <p>Negative regret is discarded rather than inverted: "I wish I hadn't" is not
+      an instruction to do the opposite, only to stop doing this. And notice what
+      the denominator does — an action with twice the regret gets twice the
+      probability, so the mix is <em>always</em> mixed. Nothing ever collapses to a
+      single pure action while another still has positive regret. That is what makes
+      bluffing appear on its own.</p>
   </div>
 
-  <div class="bar">
-    <button class="prime" id="b-step">Step ▸</button>
-    <button id="b-play">Play</button>
-    <button id="b-node">Finish node</button>
-    <button id="b-iter">Finish deal</button>
-    <div class="sep"></div>
-    <span class="eyebrow">Train fast</span>
-    <button id="b-100">+100</button>
-    <button id="b-1k">+1,000</button>
-    <button id="b-10k">+10,000</button>
-    <button id="b-200k">+200,000</button>
-    <div class="sep"></div>
-    <label>Chance
-      <select id="s-chance">
-        <option value="sample">sampled deal (as in the code)</option>
-        <option value="all">all six deals</option>
-      </select>
-    </label>
-    <div class="sep"></div>
-    <button id="b-reset">Reset</button>
+  <div class="box stack">
+    <h3>Two details that make it actually work</h3>
+
+    <p><b>1. Measure against the baseline, not against zero.</b> The value of an
+      action is compared with what the current strategy is already worth at that
+      node:</p>
+    <div class="math">u<sub>σ</sub> = Σ<sub>a</sub> σ(a)·u(a)          <span class="c">what the current mix is worth here</span>
+
+<span class="hi">R(a) += u(a) − u<sub>σ</sub></span>            <span class="c">regret, relative to that</span></div>
+    <p>This matters more than it looks. If two actions are worth 1.16 and 1.17,
+      splitting by raw value gives 49.8% / 50.2% and the program never learns.
+      Subtracting the baseline turns that thin edge into the entire signal. It also
+      creates the fixed point: because <span class="m">u<sub>σ</sub></span> is an
+      average of the action values, playing a high-regret action more pulls
+      <span class="m">u<sub>σ</sub></span> toward it, which shrinks its own regret.
+      The system settles where every action in use has <em>equal value</em> — which
+      is precisely the indifference condition that defines the equilibrium. Zero
+      regret and indifference are the same statement.</p>
+
+    <p><b>2. Weight by the opponent's chance of getting you here, not your own.</b>
+      This is the "counterfactual" in the name:</p>
+    <div class="math"><span class="hi">R(a) += π<sub>opp</sub> · (u(a) − u<sub>σ</sub>)</span></div>
+    <p>Suppose your current strategy never bets the Jack. Then you never reach any
+      decision that follows a Jack bet. Weight regret by your <em>own</em>
+      probability of arriving and those decisions count for nothing, so you never
+      learn to fix them, so you keep not going there — a trap you cannot climb out
+      of. Dropping your own reach probability breaks it: <em>counter to fact</em>,
+      assume you got here, and evaluate honestly.</p>
+    <p class="small">The running average of your strategy uses the opposite weight —
+      your <em>own</em> reach. An iteration where you rarely reached a node should
+      not dominate the record of what you do there. Two ledgers, two different
+      weights; mixing them up is the classic implementation bug.</p>
   </div>
 
-  <div class="stage">
-    <div class="panel">
-      <div class="phead">
-        <span class="t">The tree for this deal</span>
-        <span class="eyebrow" id="tree-sub">value shown to the player who acts</span>
-      </div>
-      <div class="pbody treewrap"><svg class="tree" id="tree" viewBox="0 2 618 412" role="img"
-        aria-label="Kuhn poker game tree for the current deal"></svg></div>
-    </div>
+  <div class="box stack">
+    <h3>Why it converges</h3>
+    <p>Regret matching has a guarantee: average regret per iteration falls like
+      <span class="m">1/√T</span>, so it goes to zero. Bolt that to a folk theorem
+      about two-player zero-sum games —</p>
+    <p class="q">if both players' average regret is at most ε, their average
+      strategies form a 2ε-Nash equilibrium</p>
+    <p>— and the algorithm follows. Drive regret to zero by self-play and the
+      average strategy is driven to equilibrium for free. You never solve for the
+      equilibrium; you just refuse to keep regretting things.</p>
+    <p><b>The average, not the latest.</b> The current strategy oscillates forever
+      and never settles — watch the bars below jitter while training. Only the
+      reach-weighted average over all iterations converges. The plain unweighted
+      average does not work: behavioural strategies do not average linearly.</p>
+  </div>
+</section>
 
-    <div class="panel">
-      <div class="phead">
-        <span class="t">Tape</span>
-        <span class="eyebrow" id="tape-sub">idle</span>
-      </div>
-      <div class="tape" id="tape"></div>
+<!-- ================= the algorithm ================= -->
+<section>
+  <h2>The algorithm, in full</h2>
+  <p class="small">One recursive walk of the game tree. This is the whole thing —
+    the Python in this repository is this plus bookkeeping.</p>
+  <div class="box stack">
+    <div class="math"><span class="c">cfr(history, π₁, π₂):</span>
+
+  <span class="c">if history is terminal:</span>
+      <span class="c">return</span> payoff(history)                  <span class="c">— value to whoever acts here</span>
+
+  σ = R⁺ / ΣR⁺                             <span class="c">— regret matching</span>
+  strategy_sum += <span class="hi">π<sub>self</sub></span> · σ                   <span class="c">— own reach, for the average</span>
+
+  <span class="c">for a in {pass, bet}:</span>
+      u[a] = <span class="hi">−</span>cfr(history + a, π with σ(a) folded in)
+                                           <span class="c">— negate: value changes sides</span>
+  u<sub>σ</sub> = Σ σ(a)·u[a]                        <span class="c">— the baseline</span>
+
+  <span class="c">for a in {pass, bet}:</span>
+      R[a] += <span class="hi">π<sub>opp</sub></span> · (u[a] − u<sub>σ</sub>)          <span class="c">— counterfactual regret</span>
+
+  <span class="c">return</span> u<sub>σ</sub></div>
+    <dl class="defn">
+      <dt>π₁, π₂</dt><dd>probability each player's strategy would have played the
+        moves leading here</dd>
+      <dt>u[a]</dt><dd>value of taking action <span class="m">a</span> and playing
+        the current strategy afterwards</dd>
+      <dt>R[a]</dt><dd>running regret for <span class="m">a</span>, accumulated over
+        every iteration</dd>
+      <dt>−cfr(…)</dt><dd>every value is stated from the point of view of whoever is
+        about to act, so it flips sign on the way back up</dd>
+    </dl>
+    <p class="small">Deal a random hand, call it once, repeat. Nothing else.
+      Chance is handled by sampling one deal per iteration, so the 1/6 probability
+      of each deal is implicit in how often it comes up rather than multiplied in.</p>
+  </div>
+</section>
+
+<!-- ================= watch it ================= -->
+<section>
+  <h2>Watch one iteration</h2>
+  <p class="small">A real hand, dealt from the strategy the program currently holds.
+    Step through it and the arithmetic below fills in with the actual numbers.</p>
+
+  <div class="felt">
+    <div class="seat">
+      <div class="who"><span class="face">🤖</span><span class="nm">Solver</span>
+        <span class="rl">P1</span></div>
+      <div class="card back" id="c-p1"><span class="cn">?</span><span class="mid">?</span></div>
+      <div class="act"><span class="badge wait" id="a-p1">—</span></div>
+    </div>
+    <div class="pot">
+      <span class="lab">Pot</span><div class="chips" id="pot"></div>
+      <span class="hist" id="hist"></span>
+    </div>
+    <div class="seat">
+      <div class="who"><span class="face">🐱</span><span class="nm">Opponent</span>
+        <span class="rl">P2</span></div>
+      <div class="card back" id="c-p2"><span class="cn">?</span><span class="mid">?</span></div>
+      <div class="act"><span class="badge wait" id="a-p2">—</span></div>
     </div>
   </div>
 
-  <div class="panel">
-    <div class="phead">
-      <span class="t">The twelve ledgers</span>
-      <span class="eyebrow">bar = average strategy · ▾ = equilibrium target · thin = regret sum</span>
-    </div>
-    <div class="groups" id="groups"></div>
+  <div class="speech"><p id="narrate">Deal a hand to begin.</p></div>
+
+  <div class="controls">
+    <button class="go" id="b-next">Deal</button>
+    <button id="b-auto">Auto</button>
+    <span class="counter" id="count">iterations: 0</span>
   </div>
 
-  <div class="charts">
-    <div class="panel">
-      <div class="phead"><span class="t">The 3:1 ratio emerges</span>
-        <span class="eyebrow">log iterations</span></div>
-      <div class="pbody" style="padding-bottom:4px"><canvas class="cv" id="c-ratio"></canvas></div>
-      <div class="legend">
-        <span><i style="border-color:var(--red)"></i>P1 bets K</span>
-        <span><i style="border-color:var(--red);border-top-style:dashed"></i>3α</span>
-        <span><i style="border-color:var(--ink-2)"></i>α = P1 bets J</span>
-      </div>
-    </div>
-    <div class="panel">
-      <div class="phead"><span class="t">Game value</span>
-        <span class="eyebrow">log iterations</span></div>
-      <div class="pbody" style="padding-bottom:4px"><canvas class="cv" id="c-value"></canvas></div>
-      <div class="legend">
-        <span><i style="border-color:var(--ink)"></i>value of average strategy</span>
-        <span><i style="border-color:var(--ink-3);border-top-style:dashed"></i>−1/18</span>
-      </div>
+  <div class="box stack" id="mathbox">
+    <h3 id="math-h">The arithmetic at P1's opening decision</h3>
+    <p class="small" id="math-sub">Both players' cards are shown here for clarity.
+      Neither player sees the other's — the program only ever reads its own
+      information set.</p>
+    <div class="math" id="math-body"><span class="c">step through a hand to fill this in</span></div>
+    <p class="small" id="math-note"></p>
+  </div>
+</section>
+
+<!-- ================= ledgers ================= -->
+<section>
+  <h2>The three opening decisions</h2>
+  <p class="small">Red bar = how often the average strategy bets. Where theory pins
+    a value exactly, a marker shows it. The Jack gets a striped band instead,
+    because <em>any</em> bluffing rate in that range is equally optimal — it is the
+    one free choice in the whole game.</p>
+  <div class="box stack">
+    <div id="opens"></div>
+    <div class="controls" style="margin-top:3px">
+      <button id="b-1">+1</button>
+      <button id="b-100">+100</button>
+      <button id="b-2k">+2,000</button>
+      <button id="b-50k">+50,000</button>
+      <button id="b-reset">Reset</button>
     </div>
   </div>
 
-  <div class="panel"><div class="pbody">
-    <div class="note">
-      <h3>Reading the signs</h3>
-      Every value — on the tree, on the tape, at the terminals — is stated from the point of
-      view of whoever is about to act. That is why each returned utility flips sign on the way
-      back up: <code>util[a] = −cfr(child)</code>. A terminal <code>bp</code> showing
-      <span class="mono">+1</span> means the player to act at that history collects one chip.
+  <div class="box stack">
+    <h3>All twelve information sets</h3>
+    <p class="small">Card, then the betting that led there. The marker shows the
+      exact equilibrium value where it is pinned.</p>
+    <div class="grid12" id="grid12"></div>
+  </div>
+</section>
+
+<!-- ================= convergence ================= -->
+<section>
+  <h2>Is it actually converging?</h2>
+  <div class="box stack">
+    <p><b>Exploitability</b> is the honest test: compute the best possible
+      counter-strategy to what the program currently plays, and see how much it
+      wins. At a true equilibrium no counter-strategy gains anything, so this hits
+      zero. It is computed here by brute force over all 64 pure strategies per
+      side — no estimation.</p>
+    <canvas class="cv" id="cv"></canvas>
+    <div class="legend">
+      <span><i style="border-color:var(--red)"></i>exploitability</span>
+      <span><i style="border-color:var(--ink-2)"></i>|game value − (−1/18)|</span>
     </div>
-    <div class="note">
-      <h3>Why regret is measured against the baseline</h3>
-      The update is <code>r[a] += π_opp · (u[a] − u_node)</code>, never <code>π_opp · u[a]</code>.
-      Subtracting <code>u_node</code> is what turns a thin edge between two actions into the
-      whole signal, and it is what makes the fixed point the indifference condition. Drop it and
-      every information set sits near uniform forever.
-    </div>
-    <div class="note">
-      <h3>Two different weights</h3>
-      <code>strategy_sum</code> is weighted by the acting player's <em>own</em> reach;
-      <code>regret_sum</code> by the <em>opponent's</em>. The second is what "counterfactual"
-      names: strip out your own probability of arriving, so you keep learning at the
-      information sets your current strategy avoids.
-    </div>
-  </div></div>
+    <p class="small">Both axes are logarithmic; the straight-line fall is the
+      <span class="m">1/√T</span> rate the theorem promises. It starts at
+      <span class="m">0.92</span> chips per hand — a uniform random strategy is
+      enormously exploitable — and 50,000 iterations bring it under
+      <span class="m">0.01</span>.</p>
+    <dl class="facts">
+      <dt>game value</dt><dd><span class="m" id="f-gv">—</span>, against an exact
+        <span class="m">−1/18 = −0.0556</span> for P1. The first player loses
+        slightly, and cannot avoid it.</dd>
+      <dt>P2 strategy</dt><dd>unique — all six of its information sets have exactly
+        one equilibrium value, so they can be checked one by one</dd>
+      <dt>P1 strategy</dt><dd>a one-parameter family. Let α = how often P1 bets the
+        Jack; any α in <span class="m">[0, ⅓]</span> is optimal, provided the rest
+        follows along</dd>
+      <dt>the couplings</dt><dd>bet the King at <span class="m">3α</span>, call with
+        the Queen at <span class="m">α + ⅓</span>. Nobody puts these ratios in — they
+        fall out of the regret updates</dd>
+    </dl>
+  </div>
+</section>
+
+<!-- ================= what it found ================= -->
+<section>
+  <h2>What it found, and why each is right</h2>
+  <div class="box stack" id="found"></div>
+</section>
+
+<div class="foot">
+  <span class="tiny">Every number on this page is computed live by the same
+    algorithm as <span class="m">kuhn_cfr.py</span> in this repository — in
+    deterministic mode the two agree to eight decimal places.</span>
+  <a href="detail.html">Full instrument: tree, tape, all twelve ledgers →</a>
+</div>
 </div>
 
 <script>
 "use strict";
 /* ===================================================================== *
- * CFR core — mirrors kuhn_cfr.py line for line
+ * CFR core — same maths as kuhn_cfr.py
  * ===================================================================== */
 const RANKS = ["J","Q","K"], PASS = 0, BET = 1, ACTIONS = ["p","b"], NA = 2;
 const TERMINALS = new Set(["pp","bp","bb","pbp","pbb"]);
 const isTerminal = h => TERMINALS.has(h);
-
 function payoff(h, cards){
-  const player = h.length % 2, opp = 1 - player;
-  const wins = cards[player] > cards[opp];
-  if (h[h.length-1] === "p"){
-    if (h === "pp") return wins ? 1 : -1;   // check-check showdown
-    return 1;                               // bet, opponent folded
-  }
-  return wins ? 2 : -2;                     // called bet, showdown
+  const pl = h.length % 2, wins = cards[pl] > cards[1-pl];
+  if (h[h.length-1] === "p"){ if (h === "pp") return wins ? 1 : -1; return 1; }
+  return wins ? 2 : -2;
 }
 const infoKey = (h, cards) => RANKS[cards[h.length % 2]] + h;
-
 const KEYS = ["J","Q","K","Jp","Qp","Kp","Jb","Qb","Kb","Jpb","Qpb","Kpb"];
 const newNodes = () => { const n = {};
   for (const k of KEYS) n[k] = { regret:[0,0], strat:[0,0] }; return n; };
-
-function regretMatch(regret){
-  const pos = [Math.max(regret[0],0), Math.max(regret[1],0)];
-  const total = pos[0] + pos[1];
-  return { pos, total, strat: total > 0 ? [pos[0]/total, pos[1]/total] : [1/NA, 1/NA] };
+function regretMatch(r){
+  const pos = [Math.max(r[0],0), Math.max(r[1],0)], t = pos[0]+pos[1];
+  return { pos, total:t, strat: t > 0 ? [pos[0]/t, pos[1]/t] : [1/NA, 1/NA] };
 }
-function avgStrategy(node){
-  const t = node.strat[0] + node.strat[1];
-  return t > 0 ? [node.strat[0]/t, node.strat[1]/t] : [1/NA, 1/NA];
+function avgStrategy(n){
+  const t = n.strat[0] + n.strat[1];
+  return t > 0 ? [n.strat[0]/t, n.strat[1]/t] : [1/NA, 1/NA];
 }
-
-/* one CFR pass; if `tr` is an array, every intermediate quantity is recorded */
 function cfr(nodes, cards, h, p0, p1, tr){
-  if (isTerminal(h)){
-    const v = payoff(h, cards);
-    if (tr) tr.push({ t:"terminal", h, v });
-    return v;
-  }
-  const player = h.length % 2, key = infoKey(h, cards), node = nodes[key];
-  const selfReach = player === 0 ? p0 : p1;
-  const rm = regretMatch(node.regret);
-  if (tr) tr.push({ t:"enter", h, key, player, p0, p1, selfReach,
-                    regret:[...node.regret], rm });
-  const sDelta = [selfReach*rm.strat[0], selfReach*rm.strat[1]];
-  node.strat[0] += sDelta[0]; node.strat[1] += sDelta[1];
-  if (tr) tr.push({ t:"accum", h, key, selfReach, strat:rm.strat, delta:sDelta });
-
-  const util = [0,0]; let nodeUtil = 0;
+  if (isTerminal(h)) return payoff(h, cards);
+  const pl = h.length % 2, node = nodes[infoKey(h, cards)];
+  const selfReach = pl === 0 ? p0 : p1;
+  const rm = regretMatch(node.regret), s = rm.strat;
+  node.strat[0] += selfReach*s[0]; node.strat[1] += selfReach*s[1];
+  const util = [0,0]; let uSigma = 0;
   for (let a = 0; a < NA; a++){
-    const nxt = h + ACTIONS[a];
-    const cp0 = player === 0 ? p0*rm.strat[a] : p0;
-    const cp1 = player === 0 ? p1 : p1*rm.strat[a];
-    if (tr) tr.push({ t:"descend", h, key, a, nxt, p0:cp0, p1:cp1 });
-    const child = cfr(nodes, cards, nxt, cp0, cp1, tr);
-    util[a] = -child;
-    if (tr) tr.push({ t:"return", h, key, a, child, u:util[a] });
-    nodeUtil += rm.strat[a] * util[a];
+    util[a] = -cfr(nodes, cards, h + ACTIONS[a],
+      pl === 0 ? p0*s[a] : p0, pl === 0 ? p1 : p1*s[a], tr);
+    uSigma += s[a]*util[a];
   }
-  if (tr) tr.push({ t:"combine", h, key, strat:rm.strat, util, nodeUtil });
-
-  const oppReach = player === 0 ? p1 : p0;
-  const d = [ oppReach*(util[0]-nodeUtil), oppReach*(util[1]-nodeUtil) ];
+  const oppReach = pl === 0 ? p1 : p0;
+  const d = [oppReach*(util[0]-uSigma), oppReach*(util[1]-uSigma)];
+  if (tr) tr.push({ h, key:infoKey(h,cards), regret:[...node.regret], rm,
+                    selfReach, oppReach, util, uSigma, delta:d });
   node.regret[0] += d[0]; node.regret[1] += d[1];
-  if (tr) tr.push({ t:"regret", h, key, oppReach, util, nodeUtil, delta:d,
-                    after:[...node.regret] });
-  return nodeUtil;
+  return uSigma;
 }
-
-/* evaluation: no learning, walks the average strategy over all six deals */
+/* evaluation */
 const DEALS = [[0,1],[0,2],[1,0],[1,2],[2,0],[2,1]];
 function walkAvg(nodes, cards, h){
   if (isTerminal(h)) return payoff(h, cards);
-  const avg = avgStrategy(nodes[infoKey(h, cards)]);
+  const av = avgStrategy(nodes[infoKey(h, cards)]);
   let s = 0;
-  for (let a = 0; a < NA; a++) s += avg[a] * -walkAvg(nodes, cards, h + ACTIONS[a]);
+  for (let a = 0; a < NA; a++) s += av[a] * -walkAvg(nodes, cards, h + ACTIONS[a]);
   return s;
 }
-const exactValue = nodes =>
-  DEALS.reduce((s,d) => s + walkAvg(nodes, d, ""), 0) / DEALS.length;
-
-/* exploitability by brute force over pure strategies (64 each side) */
-const P0_SETS = ["J","Q","K","Jpb","Qpb","Kpb"];
-const P1_SETS = ["Jp","Qp","Kp","Jb","Qb","Kb"];
-function evP0(profile, cards, h){
-  if (isTerminal(h)) {
-    const v = payoff(h, cards);
-    return h.length % 2 === 0 ? v : -v;          // normalise to player 0
-  }
-  const pr = profile[infoKey(h, cards)];
+const exactValue = n => DEALS.reduce((s,d) => s + walkAvg(n, d, ""), 0) / 6;
+const P0S = ["J","Q","K","Jpb","Qpb","Kpb"], P1S = ["Jp","Qp","Kp","Jb","Qb","Kb"];
+function evP0(pr, cards, h){
+  if (isTerminal(h)){ const v = payoff(h, cards);
+    return h.length % 2 === 0 ? v : -v; }
+  const p = pr[infoKey(h, cards)];
   let s = 0;
-  for (let a = 0; a < NA; a++) s += pr[a] * evP0(profile, cards, h + ACTIONS[a]);
+  for (let a = 0; a < NA; a++) s += p[a] * evP0(pr, cards, h + ACTIONS[a]);
   return s;
 }
-const gameValue = profile =>
-  DEALS.reduce((s,d) => s + evP0(profile, d, ""), 0) / DEALS.length;
-
+const gameValue = pr => DEALS.reduce((s,d) => s + evP0(pr, d, ""), 0) / 6;
 function exploitability(nodes){
   const avg = {}; for (const k of KEYS) avg[k] = avgStrategy(nodes[k]);
   let br0 = -Infinity, br1 = -Infinity;
   for (let m = 0; m < 64; m++){
-    const p = { ...avg }, q = { ...avg };
+    const p = {...avg}, q = {...avg};
     for (let i = 0; i < 6; i++){
       const bit = (m >> i) & 1;
-      p[P0_SETS[i]] = bit ? [0,1] : [1,0];
-      q[P1_SETS[i]] = bit ? [0,1] : [1,0];
+      p[P0S[i]] = bit ? [0,1] : [1,0];
+      q[P1S[i]] = bit ? [0,1] : [1,0];
     }
     br0 = Math.max(br0,  gameValue(p));
     br1 = Math.max(br1, -gameValue(q));
@@ -456,505 +601,373 @@ const mulberry32 = a => () => {
   t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
   return ((t ^ t >>> 14) >>> 0) / 4294967296;
 };
-const S = {
-  nodes:newNodes(), iter:0, chance:"sample", rand:mulberry32(91),
-  deal:[0,1,2], dealIdx:0,
-  trace:null, ti:0, playing:false, timer:null, samples:[]
-};
+const S = { nodes:newNodes(), iter:0, rand:mulberry32(91), hand:null,
+            auto:false, timer:null, samples:[] };
+let nextSample = 1;
 
-function deal(){
-  const c = [0,1,2];                                   // Fisher–Yates, seeded
+function dealCards(){
+  const c = [0,1,2];
   for (let i = 2; i > 0; i--){
-    const j = Math.floor(S.rand() * (i+1)); [c[i],c[j]] = [c[j],c[i]];
+    const j = Math.floor(S.rand()*(i+1)); [c[i],c[j]] = [c[j],c[i]];
   }
   return c;
 }
-function nextDeal(){
-  if (S.chance === "all"){ S.dealIdx = (S.dealIdx + 1) % 6;
-    const d = DEALS[S.dealIdx]; S.deal = [d[0], d[1], 3-d[0]-d[1]]; }
-  else S.deal = deal();
+function sample(force){
+  const last = S.samples[S.samples.length-1];
+  if (last && last.it === S.iter) return;
+  if (!force && S.iter < nextSample) return;
+  S.samples.push({ it:S.iter, ex:Math.max(1e-5, exploitability(S.nodes)),
+                   dv:Math.max(1e-5, Math.abs(exactValue(S.nodes) + 1/18)) });
+  nextSample = Math.max(S.iter + 1, Math.ceil(S.iter * 1.3));
 }
-
-/* ---- fast training (no tape) ---- */
 function train(n){
   for (let i = 0; i < n; i++){
-    if (S.chance === "all") for (const d of DEALS) cfr(S.nodes, d, "", 1, 1, null);
-    else cfr(S.nodes, deal(), "", 1, 1, null);
-    S.iter++;
+    cfr(S.nodes, dealCards(), "", 1, 1, null); S.iter++;
     if (S.iter >= nextSample) sample();
   }
   sample(true);
 }
-let nextSample = 1;
-function sample(force){
-  const last = S.samples[S.samples.length-1];
-  if (!force && last && last.it === S.iter) return;
-  if (force && last && last.it === S.iter) return;
-  const a = avgStrategy(S.nodes.J)[BET], k = avgStrategy(S.nodes.K)[BET];
-  S.samples.push({ it:S.iter, a, k, v:exactValue(S.nodes) });
-  nextSample = Math.max(S.iter + 1, Math.ceil(S.iter * 1.28));
-}
 
-/* ---- traced stepping ---- */
-function beginTrace(){
-  const shadow = JSON.parse(JSON.stringify(S.nodes));   // trace on a copy…
-  const tr = [];
-  cfr(shadow, S.deal, "", 1, 1, tr);                    // …so the tape leads the ledgers
-  S.trace = tr; S.ti = 0;
-  tapeEl.innerHTML = "";
-}
-function stepOnce(){
-  if (!S.trace) beginTrace();
-  if (S.ti >= S.trace.length){                          // deal complete
-    S.iter += (S.chance === "all" && S.dealIdx !== 5) ? 0 : 1;
-    sample(true); nextDeal(); S.trace = null;
-    buildTree(); paint(); return false;
+/* one displayable iteration */
+function newHand(){
+  const cards = dealCards();
+  let h = ""; const acts = [];
+  while (!isTerminal(h)){
+    const pl = h.length % 2;
+    const s = regretMatch(S.nodes[infoKey(h, cards)].regret).strat;
+    const a = S.rand() < s[BET] ? BET : PASS;
+    acts.push({ pl, h, a, s });
+    h += ACTIONS[a];
   }
-  const e = S.trace[S.ti++];
-  if (e.t === "accum"){                                 // apply the real deltas
-    const n = S.nodes[e.key]; n.strat[0] += e.delta[0]; n.strat[1] += e.delta[1];
-  } else if (e.t === "regret"){
-    const n = S.nodes[e.key]; n.regret[0] += e.delta[0]; n.regret[1] += e.delta[1];
-  }
-  emit(e); paint();
-  return true;
-}
-function stepUntil(pred){
-  let guard = 0;
-  while (guard++ < 400){
-    const before = S.trace, e = S.trace ? S.trace[S.ti] : null;
-    if (!stepOnce()) return;
-    if (before && e && pred(e)) return;
-  }
+  // the tree walk is deterministic given the ledgers, so these are exactly the
+  // numbers the real update will use
+  const shadow = JSON.parse(JSON.stringify(S.nodes)), tr = [];
+  cfr(shadow, cards, "", 1, 1, tr);
+  const steps = ["deal", ...acts.map((_,i) => "act"+i), "result", "math", "update"];
+  return { cards, h, acts, steps, si:-1, tr,
+           chips:(h.length % 2 === 0 ? 1 : -1) * payoff(h, cards) };
 }
 
 /* ===================================================================== *
- * tree rendering
- * ===================================================================== */
-const NODES_H = ["", "p", "b", "pp", "pb", "bp", "bb", "pbp", "pbb"];
-const SLOT = { pp:0, pbp:1, pbb:2, bp:3, bb:4 };
-const LAY = {};
-(function layout(){
-  const col = 168, row = 84, top = 40;
-  const y = h => {
-    if (h in SLOT) return SLOT[h]*row + top;
-    return (y(h+"p") + y(h+"b")) / 2;
-  };
-  for (const h of NODES_H) LAY[h] = { x:h.length*col + 10, y:y(h) };
-})();
-const NS = "http://www.w3.org/2000/svg";
-const el = (n, at) => { const e = document.createElementNS(NS, n);
-  for (const k in at) e.setAttribute(k, at[k]); return e; };
-
-const treeEl = document.getElementById("tree");
-const DW = 138, DH = 54, TW = 92, TH = 38, BW = DW - 58;
-
-function buildTree(){
-  treeEl.innerHTML = "";
-  const gEdge = el("g",{}), gNode = el("g",{});
-  treeEl.append(gEdge, gNode);
-
-  for (const h of NODES_H){
-    if (isTerminal(h)) continue;
-    for (let a = 0; a < NA; a++){
-      const c = h + ACTIONS[a], A = LAY[h], B = LAY[c];
-      const x1 = A.x + DW, y1 = A.y, x2 = B.x, y2 = B.y, mid = x1 + 22;
-      gEdge.append(el("path",{ id:`e-${c}`, class:"edge",
-        d:`M ${x1} ${y1} H ${mid} V ${y2} H ${x2}`, fill:"none",
-        stroke:"var(--grid)", "stroke-width":1.25 }));
-      const t = el("text",{ id:`el-${c}`, x:mid-5, y:(y1+y2)/2 + (y2>y1?12:-6),
-        "text-anchor":"end", "font-size":10, "font-family":"var(--f-mono)",
-        fill: a === BET ? "var(--red)" : "var(--ink-3)" });
-      t.textContent = ACTIONS[a];
-      gEdge.append(t);
-      const uy = y2 - (isTerminal(c) ? TH/2 : DH/2) - 5;   // sits above the child box
-      const u = el("text",{ id:`eu-${c}`, x:x2+2, y:uy,
-        "font-size":10, "font-family":"var(--f-mono)", fill:"var(--ink-3)" });
-      gEdge.append(u);
-    }
-  }
-
-  for (const h of NODES_H){
-    const P = LAY[h], term = isTerminal(h);
-    const g = el("g",{ id:`n-${h||"root"}` });
-    if (term){
-      g.append(el("rect",{ x:P.x, y:P.y-TH/2, width:TW, height:TH, rx:2,
-        fill:"var(--card-2)", stroke:"var(--rule)", "stroke-width":1,
-        id:`nb-${h}` }));
-      const lab = el("text",{ x:P.x+9, y:P.y-3, "font-size":9.5,
-        "font-family":"var(--f-mono)", fill:"var(--ink-3)" });
-      lab.textContent = h;
-      const val = el("text",{ id:`tv-${h}`, x:P.x+9, y:P.y+13, "font-size":14,
-        "font-family":"var(--f-mono)", "font-weight":600, fill:"var(--ink)" });
-      g.append(lab, val);
-    } else {
-      g.append(el("rect",{ x:P.x, y:P.y-DH/2, width:DW, height:DH, rx:2,
-        fill:"var(--card-2)", stroke:"var(--rule)", "stroke-width":1,
-        id:`nb-${h||"root"}` }));
-      const rk = el("text",{ id:`nr-${h||"root"}`, x:P.x+9, y:P.y-8,
-        "font-size":15, "font-family":"var(--f-card)", "font-weight":600,
-        fill:"var(--ink)" });
-      const hs = el("text",{ x:P.x+24, y:P.y-8, "font-size":10,
-        "font-family":"var(--f-mono)", fill:"var(--ink-3)" });
-      hs.textContent = h === "" ? "open" : h;
-      const pi = el("text",{ id:`np-${h||"root"}`, x:P.x+DW-9, y:P.y-8,
-        "text-anchor":"end", "font-size":9.5, "font-family":"var(--f-mono)",
-        fill:"var(--ink-3)" });
-      // strategy bar: pass segment in ink, bet segment in red, label kept clear of both
-      g.append(el("rect",{ x:P.x+9, y:P.y+2, width:BW, height:11, rx:1,
-        fill:"var(--sunk)" }));
-      g.append(el("rect",{ id:`nsp-${h||"root"}`, x:P.x+9, y:P.y+2, width:0,
-        height:11, fill:"var(--ink-2)" }));
-      g.append(el("rect",{ id:`nsb-${h||"root"}`, x:P.x+9, y:P.y+2, width:0,
-        height:11, fill:"var(--red)" }));
-      const pct = el("text",{ id:`nt-${h||"root"}`, x:P.x+DW-9, y:P.y+11,
-        "text-anchor":"end", "font-size":9, "font-family":"var(--f-mono)",
-        fill:"var(--ink-3)" });
-      g.append(rk, hs, pi, pct);
-    }
-    gNode.append(g);
-  }
-  paintTree();
-}
-
-function paintTree(){
-  const cards = S.deal;
-  const ev = S.trace && S.ti > 0 ? S.trace[S.ti-1] : null;
-  const active = ev ? (ev.t === "descend" ? ev.nxt : ev.h) : null;
-  const path = new Set();
-  if (active) for (let i = 0; i <= active.length; i++) path.add(active.slice(0,i));
-
-  // returned utilities seen so far this deal
-  const seen = {};
-  if (S.trace) for (let i = 0; i < S.ti; i++){
-    const e = S.trace[i];
-    if (e.t === "return") seen[e.h + ACTIONS[e.a]] = e.u;
-  }
-
-  for (const h of NODES_H){
-    const on = path.has(h), box = document.getElementById(`nb-${h||"root"}`);
-    if (!box) continue;
-    box.setAttribute("stroke", h === active ? "var(--live)" : "var(--rule)");
-    box.setAttribute("stroke-width", h === active ? 2 : 1);
-    box.setAttribute("fill", on ? "var(--live-wash)" : "var(--card-2)");
-
-    if (isTerminal(h)){
-      const v = payoff(h, cards), t = document.getElementById(`tv-${h}`);
-      t.textContent = (v > 0 ? "+" : "−") + Math.abs(v);
-      t.setAttribute("fill", v > 0 ? "var(--ink)" : "var(--neg)");
-    } else {
-      document.getElementById(`nr-${h||"root"}`).textContent =
-        RANKS[cards[h.length % 2]];
-      const st = regretMatch(S.nodes[infoKey(h, cards)].regret).strat;
-      const wp = BW * st[PASS], id = h || "root";
-      document.getElementById(`nsp-${id}`).setAttribute("width", wp.toFixed(2));
-      const betSeg = document.getElementById(`nsb-${id}`);
-      betSeg.setAttribute("x", (LAY[h].x + 9 + wp).toFixed(2));
-      betSeg.setAttribute("width", (BW - wp).toFixed(2));
-      document.getElementById(`nt-${id}`).textContent =
-        `${(st[PASS]*100).toFixed(0)}/${(st[BET]*100).toFixed(0)}`;
-      const reach = ev && ev.h === h && ev.t === "enter"
-        ? (h.length % 2 === 0 ? ev.p0 : ev.p1) : null;
-      document.getElementById(`np-${h||"root"}`).textContent =
-        reach === null ? `P${h.length % 2 + 1}` : `π ${reach.toFixed(3)}`;
-    }
-    if (h === "") continue;
-    const e = document.getElementById(`e-${h}`);
-    const isBet = h[h.length-1] === "b";
-    e.setAttribute("stroke", on ? (isBet ? "var(--red)" : "var(--ink-2)") : "var(--grid)");
-    e.setAttribute("stroke-width", on ? 2 : 1.25);
-    const ut = document.getElementById(`eu-${h}`);
-    ut.textContent = h in seen ? (seen[h] >= 0 ? "+" : "−") + Math.abs(seen[h]).toFixed(2) : "";
-  }
-}
-
-/* ===================================================================== *
- * tape
- * ===================================================================== */
-const tapeEl = document.getElementById("tape");
-const f  = (x, n=4) => (x >= 0 ? " " : "−") + Math.abs(x).toFixed(n); // column-aligned
-const fx = (x, n=3) => (x < 0 ? "−" : "") + Math.abs(x).toFixed(n);   // inline
-const fs = x => (x >= 0 ? "+" : "−") + Math.abs(x);                   // signed integer
-const par = (x, n=3) => x < 0 ? `(${fx(x,n)})` : fx(x,n);             // parenthesise negatives
-const sp = s => `<span class="p">${s}</span>`, sb = s => `<span class="b">${s}</span>`;
-const keyHTML = k => `${k[0]}${k.length>1 ? "·"+k.slice(1) : " open"}`;
-
-function emit(e){
-  const B = document.createElement("div");
-  B.className = "blk now";
-  const prev = tapeEl.querySelector(".blk.now");
-  if (prev) prev.classList.remove("now");
-  let ph = "", body = "", cm = "";
-
-  if (e.t === "enter"){
-    ph = "regret matching";
-    const r = e.regret, pos = e.rm.pos, st = e.rm.strat;
-    body =
-`r        = [${f(r[0])}, ${f(r[1])}]
-r⁺       = [${f(pos[0])}, ${f(pos[1])}]
-Σr⁺      = ${f(pos[0]+pos[1])}
-σ        = [${f(st[0],3)}, ${f(st[1],3)}]   ${sp("pass")} / ${sb("bet")}`;
-    cm = e.rm.total > 0
-      ? "Positive regret only, normalised. Negative regret is discarded, not inverted."
-      : "No positive regret yet, so the strategy falls back to uniform.";
-  }
-  else if (e.t === "accum"){
-    ph = "strategy_sum update";
-    body =
-`strategy_sum += π_self · σ
-
-π_self   = ${f(e.selfReach)}
-Δ        = ${fx(e.selfReach,4)} × [${fx(e.strat[0])}, ${fx(e.strat[1])}]
-         = [${f(e.delta[0])}, ${f(e.delta[1])}]`;
-    cm = "Own reach, not the opponent's — an iteration that rarely arrived here should not dominate the average.";
-  }
-  else if (e.t === "descend"){
-    const A = e.a === BET ? sb("bet") : sp("pass");
-    ph = `descend · ${e.a === BET ? "bet" : "pass"}`;
-    body = `cfr("${e.nxt}", π₁ = ${fx(e.p0,4)}, π₂ = ${fx(e.p1,4)})`;
-    cm = `Only the acting player's reach is multiplied by σ[${e.a === BET ? "bet" : "pass"}]; the opponent's passes through untouched.`;
-  }
-  else if (e.t === "terminal"){
-    ph = "terminal";
-    const who = e.h.length % 2 === 0 ? "P1" : "P2";
-    const why = e.h === "pp" ? "check-check showdown, one chip each in"
-      : e.h[e.h.length-1] === "p" ? "the bet took it down, opponent folded"
-      : "bet called, two chips each in";
-    body = `payoff("${e.h}") = ${fs(e.v)}`;
-    cm = `${why} — stated for ${who}, the player whose turn it would be.`;
-  }
-  else if (e.t === "return"){
-    ph = "return · sign flips";
-    body = `u[${e.a === BET ? "bet " : "pass"}] = −(${fx(e.child)}) = ${fx(e.u)}`;
-    cm = "The child reported its value to the other player. Negate it to speak for this one.";
-  }
-  else if (e.t === "combine"){
-    ph = "baseline";
-    body =
-`u_node   = Σ σ[a]·u[a]
-         = ${fx(e.strat[0])}×${par(e.util[0])} + ${fx(e.strat[1])}×${par(e.util[1])}
-         = ${fx(e.nodeUtil,4)}`;
-    cm = "What the current strategy is actually worth here. Regret is measured against this, not against zero.";
-  }
-  else if (e.t === "regret"){
-    ph = "regret update";
-    body =
-`regret_sum += π_opp · (u[a] − u_node)
-
-π_opp    = ${f(e.oppReach)}
-${sp("pass")}     ${fx(e.oppReach,4)} × (${fx(e.util[0])} − ${par(e.nodeUtil)}) = ${f(e.delta[0])}
-${sb("bet")}      ${fx(e.oppReach,4)} × (${fx(e.util[1])} − ${par(e.nodeUtil)}) = ${f(e.delta[1])}
-r        → [${f(e.after[0])}, ${f(e.after[1])}]`;
-    cm = "The two deltas always sum to zero against the baseline — regret redistributes, it does not inflate.";
-  }
-
-  const at = e.key ? keyHTML(e.key) : `"${e.h}"`;
-  B.innerHTML = `<div class="ph"><span>${ph}</span><span class="at">${at}</span></div>` +
-                `<div class="eq">${body}</div>` + (cm ? `<div class="cm">${cm}</div>` : "");
-  tapeEl.append(B);
-  while (tapeEl.children.length > 60) tapeEl.firstChild.remove();
-  B.scrollIntoView({ block:"nearest" });
-  document.getElementById("tape-sub").textContent =
-    `${S.ti} / ${S.trace.length} steps · deal ${RANKS[S.deal[0]]}${RANKS[S.deal[1]]}`;
-}
-
-/* ===================================================================== *
- * ledger
- * ===================================================================== */
-const GROUPS = [
-  { who:"P1 · opening", ctx:"first to act, nothing has happened",
-    keys:["J","Q","K"], target:n => n === "Q" ? 0 : null },
-  { who:"P2 · facing a check", ctx:"history p — P1 declined to bet",
-    keys:["Jp","Qp","Kp"], target:n => ({ Jp:1/3, Qp:0, Kp:1 })[n] },
-  { who:"P2 · facing a bet", ctx:"history b — call or fold",
-    keys:["Jb","Qb","Kb"], target:n => ({ Jb:0, Qb:1/3, Kb:1 })[n] },
-  { who:"P1 · checked, then raised on", ctx:"history pb — call or fold",
-    keys:["Jpb","Qpb","Kpb"], target:n => n === "Jpb" ? 0 : n === "Kpb" ? 1 : null }
-];
-const groupsEl = document.getElementById("groups");
-(function buildLedger(){
-  for (const g of GROUPS){
-    const d = document.createElement("div"); d.className = "grp";
-    d.innerHTML = `<div class="gh"><span class="who">${g.who}</span>
-      <span class="ctx">${g.ctx}</span></div>` +
-      g.keys.map(k => `
-      <div class="iset">
-        <div class="key"><span class="rk">${k[0]}</span>
-          <span class="hs">${k.length>1 ? k.slice(1) : "—"}</span></div>
-        <div class="bars">
-          <div class="sbar"><i id="ab-${k}"></i><u id="au-${k}"></u>
-            <b id="at-${k}"></b><span class="tick" id="tk-${k}"></span></div>
-          <div class="rbar"><span class="z"></span><i id="rb-${k}"></i></div>
-          <div class="rlab"><span id="rl-${k}"></span><span id="rr-${k}"></span></div>
-        </div>
-      </div>`).join("");
-    groupsEl.append(d);
-  }
-})();
-
-function paintLedger(){
-  const alpha = avgStrategy(S.nodes.J)[BET];
-  const dyn = { K: 3*alpha, Qpb: alpha + 1/3 };
-  let maxAbs = 1e-9;
-  for (const k of KEYS) maxAbs = Math.max(maxAbs, Math.abs(S.nodes[k].regret[0]),
-                                                  Math.abs(S.nodes[k].regret[1]));
-  for (const g of GROUPS) for (const k of g.keys){
-    const n = S.nodes[k], avg = avgStrategy(n), cur = regretMatch(n.regret).strat;
-    document.getElementById(`ab-${k}`).style.width = (avg[PASS]*100).toFixed(2) + "%";
-    document.getElementById(`au-${k}`).style.left  = (cur[PASS]*100).toFixed(2) + "%";
-    document.getElementById(`at-${k}`).textContent = avg[BET].toFixed(3);
-    const tgt = g.target(k) ?? dyn[k];
-    const tk = document.getElementById(`tk-${k}`);
-    if (tgt === undefined || tgt === null || tgt > 1) tk.style.display = "none";
-    else { tk.style.display = "block"; tk.style.left = ((1-tgt)*100).toFixed(2) + "%"; }
-    // regret: pass left of zero-line, bet right, scaled to the largest magnitude
-    const r = n.regret, bar = document.getElementById(`rb-${k}`);
-    const which = Math.abs(r[BET]) >= Math.abs(r[PASS]) ? BET : PASS;
-    const v = r[which], w = Math.min(50, 50*Math.abs(v)/maxAbs);
-    bar.style.background = which === BET ? "var(--red)" : "var(--ink-2)";
-    if (v >= 0){ bar.style.left = "50%"; bar.style.right = "auto"; }
-    else { bar.style.right = "50%"; bar.style.left = "auto"; }
-    bar.style.width = w.toFixed(2) + "%";
-    document.getElementById(`rl-${k}`).textContent = "r " + f(r[PASS],2).trim();
-    document.getElementById(`rr-${k}`).textContent = f(r[BET],2).trim();
-  }
-}
-
-/* ===================================================================== *
- * charts
- * ===================================================================== */
-function css(v){ return getComputedStyle(document.documentElement)
-  .getPropertyValue(v).trim(); }
-
-function drawChart(id, series, yLo, yHi, refs){
-  const cv = document.getElementById(id), dpr = window.devicePixelRatio || 1;
-  const W = cv.clientWidth, H = cv.clientHeight;
-  cv.width = W*dpr; cv.height = H*dpr;
-  const g = cv.getContext("2d"); g.scale(dpr, dpr); g.clearRect(0,0,W,H);
-  const L = 40, R = 8, T = 10, Bm = 22, w = W-L-R, h = H-T-Bm;
-  const maxIt = Math.max(10, S.iter);
-  const X = it => L + w * Math.log10(Math.max(1,it)) / Math.log10(Math.max(10,maxIt));
-  const Y = v => T + h * (1 - (v-yLo)/(yHi-yLo));
-
-  g.strokeStyle = css("--grid"); g.fillStyle = css("--ink-3");
-  g.lineWidth = 1; g.font = `10px ${css("--f-mono") || "monospace"}`;
-  const ticks = 4;
-  for (let i = 0; i <= ticks; i++){
-    const v = yLo + (yHi-yLo)*i/ticks, y = Math.round(Y(v)) + .5;
-    g.beginPath(); g.moveTo(L, y); g.lineTo(L+w, y); g.stroke();
-    g.textAlign = "right"; g.textBaseline = "middle";
-    g.fillText(v.toFixed(2), L-6, y);
-  }
-  const decades = Math.ceil(Math.log10(Math.max(10,maxIt)));
-  g.textAlign = "center"; g.textBaseline = "top";
-  for (let d = 0; d <= decades; d++){
-    const it = Math.pow(10,d); if (it > maxIt*1.4) break;
-    const x = Math.round(X(it)) + .5;
-    g.beginPath(); g.moveTo(x, T); g.lineTo(x, T+h);
-    g.strokeStyle = css("--hair"); g.stroke();
-    g.fillText(it >= 1000 ? (it/1000)+"k" : String(it), x, T+h+5);
-  }
-  for (const r of refs || []){
-    g.strokeStyle = r.color; g.lineWidth = 1.25; g.setLineDash([4,3]);
-    g.beginPath(); g.moveTo(L, Y(r.v)); g.lineTo(L+w, Y(r.v)); g.stroke();
-    g.setLineDash([]);
-  }
-  for (const s of series){
-    if (S.samples.length < 2) continue;
-    g.strokeStyle = s.color; g.lineWidth = s.width || 1.6;
-    g.setLineDash(s.dash || []); g.beginPath();
-    S.samples.forEach((p, i) => {
-      const x = X(p.it), y = Y(s.get(p));
-      i ? g.lineTo(x,y) : g.moveTo(x,y);
-    });
-    g.stroke(); g.setLineDash([]);
-    const last = S.samples[S.samples.length-1];
-    g.fillStyle = s.color;
-    g.beginPath(); g.arc(X(last.it), Y(s.get(last)), 2.4, 0, 7); g.fill();
-  }
-}
-function paintCharts(){
-  drawChart("c-ratio", [
-    { get:p => Math.min(1,p.k), color:css("--red"), width:1.8 },
-    { get:p => Math.min(1,3*p.a), color:css("--red"), dash:[4,3], width:1.3 },
-    { get:p => p.a, color:css("--ink-2"), width:1.5 }
-  ], 0, 1);
-  drawChart("c-value", [
-    { get:p => Math.max(-0.3, Math.min(0.2, p.v)), color:css("--ink"), width:1.8 }
-  ], -0.15, 0.15, [{ v:-1/18, color:css("--ink-3") }]);
-}
-
-/* ===================================================================== *
- * readout + paint
- * ===================================================================== */
-function paintReadout(){
-  const a = avgStrategy(S.nodes.J)[BET], k = avgStrategy(S.nodes.K)[BET];
-  const v = exactValue(S.nodes);
-  document.getElementById("ro-it").textContent = S.iter.toLocaleString();
-  document.getElementById("ro-it-n").textContent =
-    S.iter === 0 ? "untrained" : S.chance === "all" ? "× 6 deals each" : "one deal each";
-  document.getElementById("ro-gv").textContent = (v>=0?"+":"−") + Math.abs(v).toFixed(4);
-  document.getElementById("ro-a").textContent = a.toFixed(3);
-  document.getElementById("ro-k").textContent = k.toFixed(3);
-  document.getElementById("ro-k-n").textContent = `vs 3α ${(3*a).toFixed(3)}`;
-  document.getElementById("ro-ex").textContent = exploitability(S.nodes).toFixed(4);
-  const h = document.getElementById("hand");
-  h.innerHTML = [0,1].map(i =>
-    `<span class="pip"><span class="who">P${i+1}</span>
-     <span class="rk">${RANKS[S.deal[i]]}</span></span>`).join("");
-}
-function paint(){ paintTree(); paintLedger(); paintReadout(); paintCharts(); }
-
-/* ===================================================================== *
- * controls
+ * render — table
  * ===================================================================== */
 const $ = id => document.getElementById(id);
-$("b-step").onclick = () => { stopPlay(); stepOnce(); };
-$("b-node").onclick = () => { stopPlay(); stepUntil(e => e.t === "regret"); };
-$("b-iter").onclick = () => { stopPlay();
-  let g = 0; while (S.trace && g++ < 400) if (!stepOnce()) break;
-  if (!S.trace && g <= 1){ beginTrace(); while (g++ < 400) if (!stepOnce()) break; } };
-$("b-play").onclick = () => S.playing ? stopPlay() : startPlay();
-function startPlay(){ S.playing = true; $("b-play").textContent = "Pause";
-  S.timer = setInterval(() => stepOnce(), 320); }
-function stopPlay(){ S.playing = false; $("b-play").textContent = "Play";
-  clearInterval(S.timer); S.timer = null; }
+const NAME = ["Jack","Queen","King"];
+const fx = (x,n=3) => (x < 0 ? "−" : "") + Math.abs(x).toFixed(n);
+const pad = (s,n) => String(s).padEnd(n);
 
-for (const [id,n] of [["b-100",100],["b-1k",1000],["b-10k",10000],["b-200k",200000]])
-  $(id).onclick = () => {
-    stopPlay(); S.trace = null; tapeEl.innerHTML = "";
-    $("tape-sub").textContent = `trained ${n.toLocaleString()} deals without tracing`;
-    train(n); nextDeal(); buildTree(); paint();
-  };
+function setCard(el, rank, show){
+  el.classList.toggle("back", !show);
+  el.querySelector(".mid").textContent = show ? RANKS[rank] : "?";
+  el.querySelector(".cn").textContent  = show ? RANKS[rank] : "?";
+}
+function setPot(real, ghost){
+  $("pot").innerHTML = "<span class='chip'></span>".repeat(real)
+                     + "<span class='chip ghost'></span>".repeat(ghost||0);
+}
+function renderHand(){
+  const H = S.hand, phase = H.steps[H.si] || "deal";
+  const revealed = H.si >= H.steps.indexOf("result");
+  setCard($("c-p1"), H.cards[0], H.si >= 0);
+  setCard($("c-p2"), H.cards[1], revealed);
 
-$("s-chance").onchange = e => { S.chance = e.target.value; reset(); };
-$("b-reset").onclick = () => reset();
-function reset(){
-  stopPlay();
-  S.nodes = newNodes(); S.iter = 0; S.rand = mulberry32(91); S.samples = [];
-  S.trace = null; S.ti = 0; S.dealIdx = 0; nextSample = 1;
-  S.deal = S.chance === "all" ? [0,1,2] : deal();
-  tapeEl.innerHTML = ""; $("tape-sub").textContent = "idle";
-  sample(true); buildTree(); paint();
+  let shown = 0;
+  for (let i = 0; i < H.acts.length; i++)
+    if (H.si >= H.steps.indexOf("act"+i)) shown = i+1;
+  for (const pl of [0,1]){
+    const mine = H.acts.filter((a,i) => a.pl === pl && i < shown);
+    const el = $(pl === 0 ? "a-p1" : "a-p2");
+    if (!mine.length){ el.className = "badge wait"; el.textContent = "—"; }
+    else { const last = mine[mine.length-1];
+      el.className = "badge " + (last.a === BET ? "bet" : "pass");
+      el.textContent = last.a === BET ? "BET" : "PASS"; }
+  }
+  const bets = H.acts.slice(0, shown).filter(a => a.a === BET).length;
+  setPot(H.si < 0 ? 0 : 2 + bets, H.si < 0 ? 2 : 0);
+  $("hist").textContent = H.si < 0 ? "" :
+    '"' + H.acts.slice(0, shown).map(a => ACTIONS[a.a]).join("") + '"';
+
+  let say = "";
+  if (phase === "deal")
+    say = `P1 is dealt the <b>${NAME[H.cards[0]]}</b>. Its information set is `
+        + `<span class="m">${RANKS[H.cards[0]]}</span> — the card, and no betting yet.`;
+  else if (phase.startsWith("act")){
+    const i = +phase.slice(3), a = H.acts[i], who = a.pl === 0 ? "P1" : "P2";
+    const verb = a.a === BET ? "bets"
+      : (i > 0 && H.acts[i-1].a === BET) ? "folds" : "passes";
+    say = `${who} <b>${verb}</b>, drawn from its mix `
+        + `<span class="m">[${fx(a.s[0],2)} pass, ${fx(a.s[1],2)} bet]</span> at `
+        + `information set <span class="m">${infoKey(a.h, H.cards)}</span>.`;
+    if (a.pl === 0 && a.a === BET && H.cards[0] === 0)
+      say += " Betting the worst card in the deck — a bluff, and the equilibrium"
+           + " calls for exactly this some of the time.";
+  } else {
+    const c = H.chips;
+    const why = H.h === "pp"
+      ? `Neither bet, so it is a showdown for 1 chip.`
+      : H.h === "bp" ? "P2 folded to the bet."
+      : H.h === "pbp" ? "P1 folded to the bet."
+      : "The bet was called — showdown for 2 chips.";
+    say = `${why} <span class="result ${c > 0 ? "win" : "lose"}">`
+        + `${c > 0 ? "+" : "−"}${Math.abs(c)} chip${Math.abs(c) === 1 ? "" : "s"} `
+        + `to P1</span>. The tree walk now updates every information set it touched.`;
+  }
+  $("narrate").innerHTML = say;
+
+  const nx = H.steps[H.si+1];
+  $("b-next").textContent =
+    nx === undefined ? "Next iteration" : nx === "deal" ? "Deal" :
+    nx.startsWith("act") ? (H.acts[+nx.slice(3)].pl === 0 ? "P1 acts" : "P2 acts") :
+    nx === "result" ? "Showdown" : nx === "math" ? "Show the arithmetic"
+                                                : "Apply the update";
 }
 
+/* ---------- the arithmetic panel ---------- */
+function renderMath(){
+  const H = S.hand;
+  if (!H || H.si < H.steps.indexOf("math")) return;
+  const e = H.tr.find(x => x.h === "");          // P1's opening decision
+  const r = e.regret, pos = e.rm.pos, s = e.rm.strat, u = e.util;
+  const applied = H.si >= H.steps.indexOf("update");
+  const after = [r[0] + e.delta[0], r[1] + e.delta[1]];
+  const L = (lab, v) => pad(lab, 9) + v;
+
+  $("math-h").innerHTML = `The arithmetic at <span class="m">${e.key}</span>`
+    + ` — P1 holding the ${NAME[H.cards[0]]}`;
+  $("math-body").innerHTML =
+`<span class="c">1 · regret matching — turn the ledger into a mix</span>
+${L("R", `= [${fx(r[0])}, ${fx(r[1])}]`)}
+${L("R⁺", `= [${fx(pos[0])}, ${fx(pos[1])}]`)}
+${L("ΣR⁺", `= ${fx(e.rm.total)}`)}
+${L("σ", `= <span class="hi">[${fx(s[0])} <span class="p">pass</span>, ${fx(s[1])} <span class="b">bet</span>]</span>`)}
+${e.rm.total > 0 ? "" : '<span class="c">          no positive regret yet → uniform</span>\n'}
+<span class="c">2 · what each action is worth (from the tree walk below this node)</span>
+${L("u(pass)", `= ${fx(u[0])}`)}
+${L("u(bet)", `= ${fx(u[1])}`)}
+${L("u_σ", `= ${fx(s[0])}·${fx(u[0])} + ${fx(s[1])}·${fx(u[1])} = <span class="hi">${fx(e.uSigma)}</span>`)}
+<span class="c">          the baseline: what the current mix is worth here</span>
+
+<span class="c">3 · counterfactual regret — weighted by P2's reach, not P1's</span>
+${L("π_opp", `= ${fx(e.oppReach)}`)}
+<span class="p">pass</span>     ${fx(e.oppReach)} · (${fx(u[0])} − ${fx(e.uSigma)}) = ${fx(e.delta[0])}
+<span class="b">bet</span>      ${fx(e.oppReach)} · (${fx(u[1])} − ${fx(e.uSigma)}) = ${fx(e.delta[1])}
+${L("R", applied
+  ? `→ <span class="hi">[${fx(after[0])}, ${fx(after[1])}]</span>   <span class="c">applied</span>`
+  : `→ [${fx(after[0])}, ${fx(after[1])}]   <span class="c">pending</span>`)}`;
+
+  const dom = u[BET] > u[PASS] ? "bet" : u[PASS] > u[BET] ? "pass" : null;
+  $("math-note").innerHTML = (dom
+    ? `Here <span class="m">${dom}</span> beat the baseline, so its regret rose and
+       its share of the mix will grow. `
+    : `The two actions came out equal, so neither regret moves. `)
+    + `The two deltas always sum to zero against the baseline — regret
+       redistributes between actions rather than inflating. And this is one
+       iteration out of hundreds of thousands: a single hand routinely points away
+       from the equilibrium, which is exactly why the <em>average</em> strategy is
+       the answer and the current mix is not.`;
+}
+
+/* ---------- opening ledgers ---------- */
+const OPENS = [
+  { k:"K", nm:"King — the best card" },
+  { k:"Q", nm:"Queen — the trap card" },
+  { k:"J", nm:"Jack — the bluffing card" }
+];
+$("opens").innerHTML = OPENS.map(o => `
+  <div class="iset">
+    <div class="card sm"><span class="cn">${o.k}</span><span class="mid">${o.k}</span></div>
+    <div class="bars">
+      <div class="top"><span class="nm">${o.nm}</span>
+        <span class="vv" id="v-${o.k}">—</span></div>
+      <div class="track"><span class="zone" id="z-${o.k}"></span>
+        <i id="b-${o.k}"></i><span class="tick" id="t-${o.k}"></span></div>
+    </div>
+  </div>`).join("");
+
+/* ---------- all twelve ---------- */
+const PINNED = { Q:0, Jp:1/3, Qp:0, Kp:1, Jb:0, Qb:1/3, Kb:1, Jpb:0, Kpb:1 };
+const ORDER = ["J","Q","K","Jp","Qp","Kp","Jb","Qb","Kb","Jpb","Qpb","Kpb"];
+const CTX = { "":"opens", p:"after a pass", b:"facing a bet", pb:"passed, then raised on" };
+$("grid12").innerHTML = ORDER.map(k => {
+  const hist = k.slice(1);
+  return `<div class="cellset">
+    <div class="k"><b>${k[0]}<span style="opacity:.55">${hist || "·"}</span></b>
+      <span id="g-${k}-v">—</span></div>
+    <div class="mini"><i id="g-${k}"></i><span class="tick" id="gt-${k}"></span></div>
+    <span class="tiny">${CTX[hist]}</span>
+  </div>`;
+}).join("");
+
+function renderLedgers(){
+  const alpha = avgStrategy(S.nodes.J)[BET];
+  const dyn = { K:Math.min(1, 3*alpha), Qpb:Math.min(1, alpha + 1/3) };
+  // only the Jack has a genuinely free range; K and Q are pinned, so they get
+  // a marker instead of a band
+  const zones = { J:[0,1/3], Q:null, K:null };
+  for (const o of OPENS){
+    const p = avgStrategy(S.nodes[o.k])[BET];
+    $("b-"+o.k).style.width = (p*100).toFixed(1) + "%";
+    const tgt = o.k === "Q" ? 0 : o.k === "K" ? dyn.K : alpha;
+    $("v-"+o.k).textContent = `bets ${(p*100).toFixed(1)}%`
+      + (o.k === "K" ? `   ·  target 3α = ${(dyn.K*100).toFixed(1)}%` : "")
+      + (o.k === "J" ? `   ·  this is α — any value in [0, 33.3%] is optimal` : "")
+      + (o.k === "Q" ? `   ·  target 0%` : "");
+    const tk = $("t-"+o.k);
+    if (o.k === "J"){ tk.style.display = "none"; }
+    else { tk.style.display = "block"; tk.style.left = (tgt*100).toFixed(1) + "%"; }
+    const z = $("z-"+o.k), zz = zones[o.k];
+    if (!zz){ z.style.display = "none"; }
+    else { z.style.display = "block";
+      z.style.left = (zz[0]*100) + "%"; z.style.width = ((zz[1]-zz[0])*100) + "%"; }
+  }
+  for (const k of ORDER){
+    const p = avgStrategy(S.nodes[k])[BET];
+    $("g-"+k).style.width = (p*100).toFixed(1) + "%";
+    $("g-"+k+"-v").textContent = (p*100).toFixed(1) + "%";
+    const t = k in PINNED ? PINNED[k] : dyn[k];
+    const tk = $("gt-"+k);
+    if (t === undefined){ tk.style.display = "none"; }
+    else { tk.style.display = "block"; tk.style.left = (t*100).toFixed(1) + "%"; }
+  }
+  $("count").textContent = `iterations: ${S.iter.toLocaleString()}`;
+  $("f-gv").textContent = fx(exactValue(S.nodes), 4);
+  renderFound(alpha);
+  drawChart();
+}
+
+/* ---------- what it found ---------- */
+function renderFound(alpha){
+  const p = { K:avgStrategy(S.nodes.K)[BET], Q:avgStrategy(S.nodes.Q)[BET],
+              J:avgStrategy(S.nodes.J)[BET], Qb:avgStrategy(S.nodes.Qb)[BET],
+              Qpb:avgStrategy(S.nodes.Qpb)[BET] };
+  const ready = S.iter >= 500;
+  const items = ready ? [
+    ["K", "Bet the King almost always — but not quite always.",
+     `Currently ${(p.K*100).toFixed(0)}%. Betting the best hand is obvious; the
+      subtlety is <em>why not 100%</em>. The King's betting rate is chained to the
+      bluffing rate at exactly <span class="m">3α = ${(3*alpha*100).toFixed(0)}%</span>.
+      Bluff more and you must bet the King more, or an opponent could read a bet as
+      weak and call you down.`],
+    ["Q", "Never bet the Queen, but call with it a third of the time.",
+     `Opening: ${(p.Q*100).toFixed(1)}%. A Queen bet only ever gets called by a King,
+      which beats it — betting turns a hand that might win a showdown into a hand
+      that only wins when it was already ahead. So it checks. Facing a bet later it
+      calls ${(p.Qpb*100).toFixed(0)}% of the time, which theory pins at
+      <span class="m">α + ⅓ = ${((alpha+1/3)*100).toFixed(0)}%</span> — just often
+      enough that bluffing the Jack cannot become profitable.`],
+    ["J", "Bluff the Jack — the worst card in the deck.",
+     `Currently ${(p.J*100).toFixed(1)}%. This is the result that surprises people.
+      A hand that cannot win a showdown is still bet sometimes, because it wins the
+      pot outright when the opponent folds. Nobody encoded this. It appears because
+      regret matching never lets an action with positive regret drop to zero
+      probability, and folding to every bet would be exploitable.`]
+  ] : [];
+  $("found").innerHTML = ready
+    ? items.map(([k,t,d]) => `<div class="iset" style="align-items:start">
+        <div class="card sm"><span class="cn">${k}</span><span class="mid">${k}</span></div>
+        <div><h3>${t}</h3><p class="small">${d}</p></div></div>`).join("")
+      + `<p class="small"><b>None of these were programmed.</b> The input was the
+         rules of the game and one update rule. Everything above — when to bluff,
+         when to trap, and the exact ratios linking them — is what falls out of
+         driving regret to zero.</p>`
+    : `<p class="small">Run at least 500 iterations and the three learned rules,
+       with the reasoning behind each, will appear here.</p>`;
+}
+
+/* ---------- chart ---------- */
+const css = v => getComputedStyle(document.documentElement)
+  .getPropertyValue(v).trim();
+function drawChart(){
+  const cv = $("cv"), dpr = window.devicePixelRatio || 1;
+  const W = cv.clientWidth || 600, H = cv.clientHeight || 190;
+  cv.width = W*dpr; cv.height = H*dpr;
+  const g = cv.getContext("2d"); g.scale(dpr,dpr); g.clearRect(0,0,W,H);
+  const L = 44, R = 8, T = 10, B = 24, w = W-L-R, h = H-T-B;
+  const maxIt = Math.max(100, S.iter);
+  const X = it => L + w*Math.log10(Math.max(1,it))/Math.log10(maxIt);
+  const lo = -3, hi = 0.1;                       // log10 scale
+  const Y = v => T + h*(1 - (Math.log10(Math.max(1e-5,v))-lo)/(hi-lo));
+
+  g.font = "10px " + (css("--f-m") || "monospace");
+  g.strokeStyle = css("--grid"); g.fillStyle = css("--ink-3"); g.lineWidth = 1;
+  g.textAlign = "right"; g.textBaseline = "middle";
+  for (let e = 0; e >= -3; e--){
+    const y = Math.round(Y(Math.pow(10,e)))+.5;
+    g.beginPath(); g.moveTo(L,y); g.lineTo(L+w,y); g.stroke();
+    g.fillText(e === 0 ? "1" : "1e"+e, L-6, y);
+  }
+  g.textAlign = "center"; g.textBaseline = "top";
+  for (let d = 0; d <= Math.ceil(Math.log10(maxIt)); d++){
+    const it = Math.pow(10,d); if (it > maxIt*1.3) break;
+    const x = Math.round(X(it))+.5;
+    g.beginPath(); g.moveTo(x,T); g.lineTo(x,T+h); g.stroke();
+    g.fillText(it >= 1000 ? (it/1000)+"k" : String(it), x, T+h+4);
+  }
+  if (S.samples.length < 2) return;
+  for (const [key,color] of [["ex",css("--red")], ["dv",css("--ink-2")]]){
+    g.strokeStyle = color; g.lineWidth = 1.7; g.beginPath();
+    S.samples.forEach((p,i) => {
+      const x = X(p.it), y = Y(p[key]); i ? g.lineTo(x,y) : g.moveTo(x,y);
+    });
+    g.stroke();
+    const last = S.samples[S.samples.length-1];
+    g.fillStyle = color; g.beginPath();
+    g.arc(X(last.it), Y(last[key]), 2.4, 0, 7); g.fill();
+  }
+}
+
+/* ===================================================================== *
+ * driving
+ * ===================================================================== */
+function clearMath(){
+  $("math-body").innerHTML = '<span class="c">step through a hand to fill this in</span>';
+  $("math-note").textContent = "";
+  $("math-h").textContent = "The arithmetic at P1's opening decision";
+}
+function advance(){
+  if (!S.hand || S.hand.si >= S.hand.steps.length-1){
+    S.hand = newHand(); S.hand.si = 0; clearMath();
+  } else S.hand.si++;
+  if (S.hand.steps[S.hand.si] === "update"){
+    cfr(S.nodes, S.hand.cards, "", 1, 1, null);   // the real update
+    S.iter++; sample(true); renderLedgers();
+  }
+  renderHand(); renderMath();
+}
+function fast(n){ stopAuto(); train(n); renderLedgers(); }
+function startAuto(){ S.auto = true; $("b-auto").classList.add("on");
+  $("b-auto").textContent = "Stop"; S.timer = setInterval(advance, 1000); }
+function stopAuto(){ S.auto = false; $("b-auto").classList.remove("on");
+  $("b-auto").textContent = "Auto"; clearInterval(S.timer); S.timer = null; }
+
+$("b-next").onclick = () => { stopAuto(); advance(); };
+$("b-auto").onclick = () => S.auto ? stopAuto() : startAuto();
+$("b-1").onclick    = () => fast(1);
+$("b-100").onclick  = () => fast(100);
+$("b-2k").onclick   = () => fast(2000);
+$("b-50k").onclick  = () => fast(50000);
+$("b-reset").onclick = () => {
+  stopAuto();
+  S.nodes = newNodes(); S.iter = 0; S.rand = mulberry32(91);
+  S.hand = null; S.samples = []; nextSample = 1;
+  setCard($("c-p1"), 0, false); setCard($("c-p2"), 0, false);
+  for (const id of ["a-p1","a-p2"]){
+    $(id).className = "badge wait"; $(id).textContent = "—"; }
+  setPot(0,2); $("hist").textContent = "";
+  $("narrate").textContent = "Deal a hand to begin.";
+  $("b-next").textContent = "Deal";
+  clearMath(); sample(true); renderLedgers();
+};
 document.addEventListener("keydown", e => {
-  if (e.target.tagName === "SELECT") return;
-  if (e.key === "ArrowRight"){ e.preventDefault(); stopPlay(); stepOnce(); }
-  if (e.key === " "){ e.preventDefault(); S.playing ? stopPlay() : startPlay(); }
+  if (e.key === "ArrowRight" || e.key === " "){
+    e.preventDefault(); stopAuto(); advance(); }
 });
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", drawChart);
+new MutationObserver(drawChart).observe(document.documentElement,
+  { attributes:true, attributeFilter:["data-theme"] });
+addEventListener("resize", drawChart);
 
-/* theme + size changes redraw the canvases */
-matchMedia("(prefers-color-scheme: dark)").addEventListener("change", paintCharts);
-new MutationObserver(paintCharts)
-  .observe(document.documentElement, { attributes:true, attributeFilter:["data-theme"] });
-addEventListener("resize", paintCharts);
-
-/* go */
-S.deal = deal();
-sample(true);
-buildTree();
-paint();
+setPot(0,2); sample(true); renderLedgers();
 </script>
 </body>
 </html>

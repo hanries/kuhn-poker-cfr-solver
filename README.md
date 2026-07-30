@@ -52,20 +52,24 @@ print(trainer.nodes['Qb'].average_strategy())            # [0.661, 0.339]
 
 [hanries.github.io/kuhn-poker-cfr-solver](https://hanries.github.io/kuhn-poker-cfr-solver/)
 
-One self-contained HTML page, no build step and no dependencies, showing four linked views:
+Two self-contained HTML pages. No build step, no dependencies, no external requests.
 
-- **The tree** for the current deal. Each decision node carries its information set, its
-  live regret-matched strategy, and its reach probability; returned utilities appear on the
-  edges as the recursion unwinds.
-- **The tape**, which writes out each step's arithmetic with the numbers substituted in —
-  regret matching, the `strategy_sum` accumulation, the sign flip on return, the baseline,
-  and the regret update.
-- **The twelve ledgers**, average-strategy bars with a marker at each equilibrium target.
-  Player 2's six entries settle onto their markers; the King tracks 3α as α drifts.
-- **Convergence**, `K` closing onto 3α and the game value approaching -1/18 on log axes.
+**[The explainer](https://hanries.github.io/kuhn-poker-cfr-solver/)** answers *what is
+CFR and how does it work*, for a reader who has not met regret minimization before. It
+builds up the argument — why you cannot simply maximize value, what regret measures,
+why regret matching converges, why the baseline is subtracted, why the weight is the
+opponent's reach and not your own, and why the average strategy is the answer — then
+deals a real hand and shows the arithmetic at Player 1's opening decision with the
+actual numbers substituted in. Below that: the three opening decisions against their
+theoretical targets, all twelve information sets, and exploitability falling from 0.92
+to under 0.01 on log axes.
 
-Step it, play it, or fast-forward to 200,000 iterations. The chance node switches between
-one sampled deal per iteration, as the Python does, and an exhaustive walk of all six.
+**[The instrument](https://hanries.github.io/kuhn-poker-cfr-solver/detail.html)** is for
+a reader who already knows the algorithm and wants to inspect it. The full game tree per
+deal with live strategies and reach probabilities, a tape writing out every step of the
+recursion in order, all twelve ledgers, and convergence plots. Step, play, or
+fast-forward to 200,000 iterations; the chance node switches between one sampled deal
+per iteration, as the Python does, and an exhaustive walk of all six.
 
 That second mode has no RNG, which makes it a cross-check rather than a demo: the
 JavaScript reproduces `kuhn_cfr.py` exactly, all twelve average strategies agreeing to
@@ -322,10 +326,10 @@ The only seam between the game layer and the learning layer is `info_set_key`, w
 turns game state into a dictionary key. Swap the game layer for Leduc and `Node` does
 not change; swap vanilla CFR for CFR+ and the rulebook does not change.
 
-**`docs/index.html`** is the visualizer, and it shares no code with `kuhn_cfr.py` — it
-carries its own JavaScript port of the same recursion. That duplication is the point:
-two independent implementations that agree to eight decimal places check each other in a
-way one implementation cannot check itself.
+**`docs/index.html`** and **`docs/detail.html`** are the two visualizer pages, and
+neither shares code with `kuhn_cfr.py` — each carries its own JavaScript port of the same
+recursion. That duplication is the point: two independent implementations that agree to
+eight decimal places check each other in a way one implementation cannot check itself.
 
 ### The two ledgers
 
